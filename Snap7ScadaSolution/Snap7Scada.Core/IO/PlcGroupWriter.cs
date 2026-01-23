@@ -68,20 +68,22 @@ public class PlcGroupWriter
                 int length = maxOffset - minOffset;
 
                 byte[] buffer = new byte[length];
-
-                // ⚠️ RẤT QUAN TRỌNG:
-                // Phải DBRead trước để tránh ghi đè bit/byte khác
-                _plc.Client.DBRead(group.Key, minOffset, length, buffer);
-
-                // Ghi từng tag vào buffer
-                foreach (var tag in group)
+                lock (_plc.SyncLock)
                 {
-                    int index = tag.Offset - minOffset;
-                    WriteValue(buffer, index, tag);
-                }
+                    // ⚠️ RẤT QUAN TRỌNG:
+                    // Phải DBRead trước để tránh ghi đè bit/byte khác
+                    _plc.Client.DBRead(group.Key, minOffset, length, buffer);
 
-                // Ghi DB chỉ 1 lần
-                _plc.Client.DBWrite(group.Key, minOffset, length, buffer);
+                    // Ghi từng tag vào buffer
+                    foreach (var tag in group)
+                    {
+                        int index = tag.Offset - minOffset;
+                        WriteValue(buffer, index, tag);
+                    }
+
+                    // Ghi DB chỉ 1 lần
+                    _plc.Client.DBWrite(group.Key, minOffset, length, buffer);
+                }
             }
         });
     }

@@ -43,22 +43,25 @@ public class PlcGroupReader
 
                 byte[] buffer = new byte[length];
 
-                // Đọc DB chỉ 1 lần
-                _plc.Client.DBRead(group.Key, min, length, buffer);
-
-                // Giải mã từng tag
-                foreach (var tag in group)
+                lock (_plc.SyncLock)
                 {
-                    int index = tag.Offset - min;
-                    //tag.Value = ReadValue(buffer, index, tag);
+                    // Đọc DB chỉ 1 lần
+                    _plc.Client.DBRead(group.Key, min, length, buffer);
 
-                    //xử lý lại giá trị của tag trước khi trả về
-                    object rawData = ReadValue(buffer, index, tag);
-                    // Gọi hàm xử lý để tính toán Gain/Offset
-                    tag.ApplyScaling(rawData);
+                    // Giải mã từng tag
+                    foreach (var tag in group)
+                    {
+                        int index = tag.Offset - min;
+                        //tag.Value = ReadValue(buffer, index, tag);
 
-                    // Kích hoạt sự kiện để WinForm cập nhật UI
-                    tag.RaiseValueChanged();
+                        //xử lý lại giá trị của tag trước khi trả về
+                        object rawData = ReadValue(buffer, index, tag);
+                        // Gọi hàm xử lý để tính toán Gain/Offset
+                        tag.ApplyScaling(rawData);
+
+                        // Kích hoạt sự kiện để WinForm cập nhật UI
+                        tag.RaiseValueChanged();
+                    }
                 }
             }
         });

@@ -69,19 +69,27 @@
         "Name": "ScaleValue",
         "Address": "DB1.DBD22",
         "DataType": "Real",
-        "Deadband": 0.01
+        "Deadband": 0.01,
+        "OffsetValue": 0,
+        "GainRate": 1,
+        "NumDecimal": 2
       },
       {
         "Name": "StableSccaleValue",
         "Address": "DB1.DBB26",
         "DataType": "Real",
-        "Deadband": 0.01
+        "Deadband": 0.01,
+        "OffsetValue": 0,
+        "GainRate": 1,
+        "NumDecimal": 1
       },
       {
         "Name": "StandardGrossWeight",
         "Address": "DB1.DBB12",
         "DataType": "Real",
-        "Deadband": 0.01
+        "Deadband": 0.01,
+        "OffsetValue": 0,
+        "GainRate": 1
       }
     ]
   }

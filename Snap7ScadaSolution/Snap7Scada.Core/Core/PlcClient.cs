@@ -10,6 +10,13 @@ namespace Snap7ClientLib.Core
     /// </summary>
     public class PlcClient : IDisposable
     {
+        /// <summary>
+        /// Biến dùng để ngăn chặn hiện tượng "độc chiếm tài nguyên" (Resource Contention).
+        /// Để tránh việc Đọc và Ghi "đâm" vào nhau gây ra trễ tích lũy, bạn nên thêm một cơ chế khóa đơn giản trong lớp PlcClient hoặc các lớp Reader/Writer.
+        /// Khóa dùng chung cho cả Read và Write.
+        /// </summary>
+        public readonly object SyncLock = new object(); // Khóa dùng chung cho cả Read và Write
+
         private readonly S7Client _client = new();
         private readonly string _host;
         private readonly int _rack;
