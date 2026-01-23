@@ -1,6 +1,5 @@
-﻿using Snap7ClientLib.Tags;
-using System.Text.Json;
-using System.Text.Json.Serialization;
+﻿using Newtonsoft.Json;
+using Snap7ClientLib.Tags;
 
 namespace Snap7ClientLib.Config;
 
@@ -11,13 +10,7 @@ public static class PlcTagConfigLoader
 
         string json = File.ReadAllText(file);
 
-        var options = new JsonSerializerOptions
-        {
-            PropertyNameCaseInsensitive = true,
-            Converters = { new JsonStringEnumConverter() }
-        };
-
-        var list = JsonSerializer.Deserialize<List<PlcConfig>>(json, options);
+        var list = JsonConvert.DeserializeObject<List<PlcConfig>>(json);
         return list ?? new List<PlcConfig>();
     }
 }
