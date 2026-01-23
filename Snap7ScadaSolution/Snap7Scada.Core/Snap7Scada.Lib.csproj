@@ -6,6 +6,13 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
+
+    <VersionPrefix>1.0</VersionPrefix>
+    <VersionSuffix>$([System.DateTime]::Now.ToString("MMdd.HHmm"))</VersionSuffix>
+    <AssemblyVersion>$(VersionPrefix).$(VersionSuffix)</AssemblyVersion>
+    <FileVersion>$(VersionPrefix).$(VersionSuffix)</FileVersion>
+    <Version>$(VersionPrefix).$(VersionSuffix)</Version>
+    <Copyright>PT Automation Solution</Copyright>
   </PropertyGroup>
 
   <ItemGroup>
@@ -19,5 +26,20 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
+
+  <Target Name="CopyLibraryAfterBuild" AfterTargets="PostBuildEvent" Condition="'$(Configuration)' == 'Release'">
+    <PropertyGroup>
+      <DestinationFolder>D:\3.Others\0.Code\202600120_Snap7\Snap7ScadaSolution\Release_Lib</DestinationFolder>
+    </PropertyGroup>
+
+    <Message Text="Starting copy library files to $(DestinationFolder)..." Importance="high" />
+
+    <MakeDir Directories="$(DestinationFolder)" />
+
+    <Copy SourceFiles="$(OutputPath)$(AssemblyName).dll" DestinationFolder="$(DestinationFolder)" />
+    <Copy SourceFiles="$(OutputPath)$(AssemblyName).pdb" DestinationFolder="$(DestinationFolder)" />
+
+    <Message Text="Copy completed successfully!" Importance="high" />
+  </Target>
 
 </Project>
