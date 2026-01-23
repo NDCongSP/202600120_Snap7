@@ -47,40 +47,43 @@ public class PlcGroupWriter
     /// </summary>
     public void WriteGroup(IEnumerable<PlcTag> tags)
     {
-        // Đảm bảo PLC luôn connected
-        if (!_plc.EnsureConnected())
-            throw new Exception("PLC not connected");
-
-        var list = tags.ToList();
-
-        // Parse địa chỉ PLC cho từng tag
-        foreach (var tag in list)
-            PlcAddressParser.Parse(tag);
-
-        // Group theo DB number
-        foreach (var group in list.GroupBy(t => t.Db))
+        Diagnostics.MeasureRead(() =>
         {
-            // Xác định vùng nhớ cần ghi nhỏ nhất
-            int minOffset = group.Min(t => t.Offset);
-            int maxOffset = group.Max(t => t.Offset + t.Size);
-            int length = maxOffset - minOffset;
+            // Đảm bảo PLC luôn connected
+            if (!_plc.EnsureConnected())
+                throw new Exception("PLC not connected");
 
-            byte[] buffer = new byte[length];
+            var list = tags.ToList();
 
-            // ⚠️ RẤT QUAN TRỌNG:
-            // Phải DBRead trước để tránh ghi đè bit/byte khác
-            _plc.Client.DBRead(group.Key, minOffset, length, buffer);
+            // Parse địa chỉ PLC cho từng tag
+            foreach (var tag in list)
+                PlcAddressParser.Parse(tag);
 
-            // Ghi từng tag vào buffer
-            foreach (var tag in group)
+            // Group theo DB number
+            foreach (var group in list.GroupBy(t => t.Db))
             {
-                int index = tag.Offset - minOffset;
-                WriteValue(buffer, index, tag);
-            }
+                // Xác định vùng nhớ cần ghi nhỏ nhất
+                int minOffset = group.Min(t => t.Offset);
+                int maxOffset = group.Max(t => t.Offset + t.Size);
+                int length = maxOffset - minOffset;
 
-            // Ghi DB chỉ 1 lần
-            _plc.Client.DBWrite(group.Key, minOffset, length, buffer);
-        }
+                byte[] buffer = new byte[length];
+
+                // ⚠️ RẤT QUAN TRỌNG:
+                // Phải DBRead trước để tránh ghi đè bit/byte khác
+                _plc.Client.DBRead(group.Key, minOffset, length, buffer);
+
+                // Ghi từng tag vào buffer
+                foreach (var tag in group)
+                {
+                    int index = tag.Offset - minOffset;
+                    WriteValue(buffer, index, tag);
+                }
+
+                // Ghi DB chỉ 1 lần
+                _plc.Client.DBWrite(group.Key, minOffset, length, buffer);
+            }
+        });
     }
 
     /// <summary>

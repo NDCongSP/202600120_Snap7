@@ -22,35 +22,38 @@ public class PlcGroupReader
     /// </summary>
     public void ReadGroup(IEnumerable<PlcTag> tags)
     {
-        // Đảm bảo PLC đang connected
-        _plc.EnsureConnected();
-
-        var list = tags.ToList();
-
-        // Parse địa chỉ từng tag
-        foreach (var tag in list)
-            PlcAddressParser.Parse(tag);
-
-        // Group theo DB number
-        foreach (var group in list.GroupBy(t => t.Db))
+        Diagnostics.MeasureRead(() =>
         {
-            // Tính vùng nhớ nhỏ nhất cần đọc
-            int min = group.Min(t => t.Offset);
-            int max = group.Max(t => t.Offset + t.Size);
-            int length = max - min;
+            // Đảm bảo PLC đang connected
+            _plc.EnsureConnected();
 
-            byte[] buffer = new byte[length];
+            var list = tags.ToList();
 
-            // Đọc DB chỉ 1 lần
-            _plc.Client.DBRead(group.Key, min, length, buffer);
+            // Parse địa chỉ từng tag
+            foreach (var tag in list)
+                PlcAddressParser.Parse(tag);
 
-            // Giải mã từng tag
-            foreach (var tag in group)
+            // Group theo DB number
+            foreach (var group in list.GroupBy(t => t.Db))
             {
-                int index = tag.Offset - min;
-                tag.Value = ReadValue(buffer, index, tag);
+                // Tính vùng nhớ nhỏ nhất cần đọc
+                int min = group.Min(t => t.Offset);
+                int max = group.Max(t => t.Offset + t.Size);
+                int length = max - min;
+
+                byte[] buffer = new byte[length];
+
+                // Đọc DB chỉ 1 lần
+                _plc.Client.DBRead(group.Key, min, length, buffer);
+
+                // Giải mã từng tag
+                foreach (var tag in group)
+                {
+                    int index = tag.Offset - min;
+                    tag.Value = ReadValue(buffer, index, tag);
+                }
             }
-        }
+        });
     }
 
     /// <summary>
