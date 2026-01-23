@@ -1,0 +1,29 @@
+{
+  "plcs": [
+    {
+      "name": "PLC_1",
+      "host": "192.168.1.100",
+      "rack": 0,
+      "slot": 1,
+      "tags": [
+        {
+          "name": "ScaleValue",
+          "address": "DB1.DBD22",
+          "type": "Real",
+          "deadband": 0.01
+        },
+        {
+          "name": "IsCheck",
+          "address": "DB1.DBX2.0",
+          "type": "Bool"
+        },
+        {
+          "name": "ProductName",
+          "address": "DB1.DBB30",
+          "type": "String",
+          "length": 50
+        }
+      ]
+    }
+  ]
+}

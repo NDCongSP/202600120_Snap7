@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="Snap7Client/Snap7ClientLib.csproj" />
+  <Project Path="TestClient/TestClient.csproj" />
+</Solution>

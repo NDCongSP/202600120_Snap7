@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="Snap7Scada.Core/Snap7Scada.Lib.csproj" />
+  <Project Path="Snap7Scada.WinFormsTest/Snap7Scada.WinFormsTest.csproj" />
+</Solution>
