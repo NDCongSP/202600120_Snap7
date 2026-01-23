@@ -48,7 +48,7 @@ public class TagConfig
     /// <summary>
     /// Cộng vào giá trị của tag rồi trả về.
     /// </summary>
-    public double Offset { get; set; } = 0;
+    public double OffsetValue { get; set; } = 0;
 
     /// <summary>
     /// Nhân vào giá trị của tag rồi trả về.
@@ -58,5 +58,5 @@ public class TagConfig
     /// <summary>
     /// Hiển bao nhiêu số lẻ sau dấu chấm.
     /// </summary>
-    public double NumDecimal { get; set; } = 3;
+    public int NumDecimal { get; set; } = 3;
 }

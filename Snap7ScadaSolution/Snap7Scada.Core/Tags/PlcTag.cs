@@ -7,6 +7,8 @@ namespace Snap7ClientLib.Tags;
 /// </summary>
 public class PlcTag
 {
+
+
     /// <summary>
     /// Tên tag (dùng cho UI / Subscription)
     /// </summary>
@@ -41,6 +43,46 @@ public class PlcTag
 
     // 1. Thêm LastValue để so sánh hoặc hiển thị lịch sử gần nhất 🔄
     public object? LastValue { get; set; }
+
+    // ... các thuộc tính cơ bản
+    public double OffsetValue { get; set; } = 0;
+    public double GainRate { get; set; } = 1;
+    public int NumDecimal { get; set; } = 3;
+
+    /// <summary>
+    /// Giá trị thô từ PLC
+    /// </summary>
+    public object? RawValue { get; set; }
+
+    public void ApplyScaling(object raw)
+    {
+        // Cất giá trị thô để debug nếu cần
+        this.RawValue = raw;
+
+        //if (raw is float || raw is double || raw is int || raw is short || raw is ushort)
+        if (raw is not string && raw is not bool)
+        {
+            try
+            {
+                double rawDouble = Convert.ToDouble(raw);
+
+                // Công thức: (Giá trị thô * Gain) + Offset
+                double scaledValue = (rawDouble * GainRate) + OffsetValue;
+
+                // Làm tròn theo số chữ số thập phân cấu hình
+                this.Value = Math.Round(scaledValue, (int)NumDecimal);
+            }
+            catch { this.Value = raw; } // Nếu lỗi thì trả về giá trị thô
+        }
+        else
+        {
+            // Đối với String hoặc Bool, không áp dụng scaling
+            this.Value = raw;
+        }
+
+        // Đảm bảo Status luôn cập nhật là Connected khi có dữ liệu
+        this.Status = PlcConnectionState.Connected;
+    }
 
     // 2. Thêm Status để biết tag có đang kết nối tốt không ✅
     public PlcConnectionState Status { get; set; } = PlcConnectionState.Disconnected;

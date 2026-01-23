@@ -50,7 +50,15 @@ public class PlcGroupReader
                 foreach (var tag in group)
                 {
                     int index = tag.Offset - min;
-                    tag.Value = ReadValue(buffer, index, tag);
+                    //tag.Value = ReadValue(buffer, index, tag);
+
+                    //xử lý lại giá trị của tag trước khi trả về
+                    object rawData = ReadValue(buffer, index, tag);
+                    // Gọi hàm xử lý để tính toán Gain/Offset
+                    tag.ApplyScaling(rawData);
+
+                    // Kích hoạt sự kiện để WinForm cập nhật UI
+                    tag.RaiseValueChanged();
                 }
             }
         });
@@ -75,10 +83,10 @@ public class PlcGroupReader
         PlcDataType.Int => S7.GetIntAt(b, i),
         PlcDataType.DWord or PlcDataType.UDInt => S7.GetDWordAt(b, i),
         PlcDataType.DInt => S7.GetDIntAt(b, i),
-        PlcDataType.Real => S7.GetRealAt(b, i),
+        PlcDataType.Real => S7.GetRealAt(b, i), // Trả về float
         PlcDataType.LWord or PlcDataType.ULInt => S7.GetULIntAt(b, i),
         PlcDataType.LInt => S7.GetLIntAt(b, i),
-        PlcDataType.LReal => S7.GetLRealAt(b, i),
+        PlcDataType.LReal => S7.GetLRealAt(b, i), // Trả về double
         PlcDataType.String => S7.GetStringAt(b, i),
         _ => null!
     };

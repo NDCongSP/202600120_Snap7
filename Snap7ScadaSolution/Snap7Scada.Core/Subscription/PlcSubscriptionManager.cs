@@ -51,13 +51,13 @@ public class PlcSubscriptionManager
                 // 3. So sánh giá trị mới và cũ
                 if (IsValueChanged(oldVal, tag.Value, tag.DataType))
                 {
-                    // Lưu giá trị cũ vào LastValue trước khi cập nhật mới 🔄
+                    // Lưu giá trị cũ vào LastValue trước khi cập nhật mới
                     tag.LastValue = oldVal;
 
                     // Cập nhật giá trị mới vào cache
                     _cache[tag.Name] = tag.Value;
 
-                    // 4. Kích hoạt sự kiện riêng của chính Tag đó 📣
+                    // 4. Kích hoạt sự kiện riêng của chính Tag đó
                     tag.RaiseValueChanged();
 
                     // Vẫn kích hoạt sự kiện chung của Manager nếu cần
@@ -92,13 +92,13 @@ public class PlcSubscriptionManager
                 // 3. So sánh giá trị mới và cũ
                 if (IsValueChanged(oldVal, tag.Value, tag.DataType))
                 {
-                    // Lưu giá trị cũ vào LastValue trước khi cập nhật mới 🔄
+                    // Lưu giá trị cũ vào LastValue trước khi cập nhật mới
                     tag.LastValue = oldVal;
 
                     // Cập nhật giá trị mới vào cache
                     _cache[tag.Name] = tag.Value;
 
-                    // 4. Kích hoạt sự kiện riêng của chính Tag đó 📣
+                    // 4. Kích hoạt sự kiện riêng của chính Tag đó
                     tag.RaiseValueChanged();
 
                     // Vẫn kích hoạt sự kiện chung của Manager nếu cần
@@ -116,16 +116,13 @@ public class PlcSubscriptionManager
     /// </summary>
     private static bool IsValueChanged(object? oldVal, object? newVal, PlcDataType type)
     {
-        if (oldVal == null || newVal == null)
-            return true;
+        if (oldVal == null || newVal == null) return true;
 
         return type switch
         {
-            PlcDataType.Real =>
-                Math.Abs((float)oldVal - (float)newVal) > 0.001f,
-
-            PlcDataType.LReal =>
-                Math.Abs((double)oldVal - (double)newVal) > 0.0001,
+            // Sử dụng Convert.ToDouble để an toàn cho cả float và double
+            PlcDataType.Real or PlcDataType.LReal =>
+                Math.Abs(Convert.ToDouble(oldVal) - Convert.ToDouble(newVal)) > 0.0001,
 
             _ => !Equals(oldVal, newVal)
         };

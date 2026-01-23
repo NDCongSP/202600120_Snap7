@@ -30,7 +30,10 @@ public class PlcManager
                     Name = t.Name,
                     Address = t.Address,
                     DataType = t.DataType,
-                    StringLength = t.Length
+                    StringLength = t.Length,
+                    OffsetValue = t.OffsetValue,
+                    GainRate = t.GainRate,
+                    NumDecimal = t.NumDecimal
                 }).ToList()
             };
         }
