@@ -1,4 +1,6 @@
-﻿namespace Snap7ClientLib.Tags;
+﻿using Snap7ClientLib.Core;
+
+namespace Snap7ClientLib.Tags;
 
 /// <summary>
 /// Đại diện cho 1 tag PLC giống SCADA (Kepware, WinCC...)
@@ -36,6 +38,23 @@ public class PlcTag
     /// Giá trị đọc được / sẽ ghi xuống PLC
     /// </summary>
     public object? Value { get; set; }
+
+    // 1. Thêm LastValue để so sánh hoặc hiển thị lịch sử gần nhất 🔄
     public object? LastValue { get; set; }
 
+    // 2. Thêm Status để biết tag có đang kết nối tốt không ✅
+    public PlcConnectionState Status { get; set; } = PlcConnectionState.Disconnected;
+
+    /// <summary>
+    /// Sự kiện riêng cho từng tag
+    /// </summary>
+    public event Action<PlcTag>? ValueChanged;
+
+    /// <summary>
+    /// Phương thức hỗ trợ để kích hoạt sự kiện
+    /// </summary>
+    public void RaiseValueChanged()
+    {
+        ValueChanged?.Invoke(this);
+    }
 }

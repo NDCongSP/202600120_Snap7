@@ -1,7 +1,7 @@
 [
   {
     "Name": "PLC_1",
-    "Host": "phucthinhautomation.ddns.net",
+    "Host": "10.11.17.10",
     "Rack": 0,
     "Slot": 1,
     "Tags": [

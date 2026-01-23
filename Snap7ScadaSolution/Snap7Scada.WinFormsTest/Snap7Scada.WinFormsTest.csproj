@@ -13,6 +13,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Update="tags1.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Update="tags.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

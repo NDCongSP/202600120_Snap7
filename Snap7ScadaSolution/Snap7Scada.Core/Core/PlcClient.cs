@@ -13,7 +13,9 @@ public class PlcClient : IDisposable
     private readonly string _host;
     private readonly int _rack;
     private readonly int _slot;
-    private Timer? _watchdog;
+
+    private CancellationTokenSource? _watchdogCts;
+    private readonly SemaphoreSlim _connectionLock = new(1, 1); // Đảm bảo không kết nối chồng chéo
 
     public PlcConnectionState State { get; private set; } =
         PlcConnectionState.Disconnected;
@@ -79,22 +81,56 @@ public class PlcClient : IDisposable
     public Task<bool> EnsureConnectedAsync()
         => Task.Run(EnsureConnected);
 
-    /// <summary>
-    /// Watchdog PLC sống
-    /// </summary>
     public void StartWatchdog(int intervalMs = 2000)
     {
-        _watchdog = new Timer(_ =>
+        // Dừng watchdog cũ nếu đang chạy
+        StopWatchdog();
+
+        _watchdogCts = new CancellationTokenSource();
+        var token = _watchdogCts.Token;
+
+        // Chạy một Task ngầm không chặn luồng chính
+        _ = Task.Run(async () =>
         {
-            if (!_client.Connected)
-                EnsureConnected();
-        }, null, 0, intervalMs);
+            while (!token.IsCancellationRequested)
+            {
+                try
+                {
+                    if (!_client.Connected)
+                    {
+                        // Sử dụng Lock để tránh nhiều luồng cùng gọi Connect một lúc
+                        await _connectionLock.WaitAsync(token);
+                        try
+                        {
+                            // Kiểm tra lại sau khi lấy được lock
+                            if (!_client.Connected)
+                            {
+                                SetState(PlcConnectionState.Reconnecting);
+                                await ConnectAsync();
+                            }
+                        }
+                        finally
+                        {
+                            _connectionLock.Release();
+                        }
+                    }
+                }
+                catch (Exception)
+                {
+                    SetState(PlcConnectionState.Error);
+                }
+
+                // Nghỉ đúng khoảng thời gian rồi mới kiểm tra tiếp
+                await Task.Delay(intervalMs, token);
+            }
+        }, token);
     }
 
     public void StopWatchdog()
     {
-        _watchdog?.Dispose();
-        _watchdog = null;
+        _watchdogCts?.Cancel();
+        _watchdogCts?.Dispose();
+        _watchdogCts = null;
     }
 
     internal S7Client Client => _client;

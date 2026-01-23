@@ -1,26 +1,4 @@
-﻿//namespace Snap7ClientLib.Core;
-
-///// <summary>
-///// Quản lý nhiều PLC (SCADA core)
-///// </summary>
-//public class PlcManager
-//{
-//    private readonly Dictionary<string, PlcClient> _plcs = new();
-
-//    public PlcClient Add(string name, string host)
-//    {
-//        var plc = new PlcClient(host);
-//        _plcs[name] = plc;
-//        return plc;
-//    }
-
-//    public PlcClient Get(string name)
-//        => _plcs[name];
-
-//    public IEnumerable<PlcClient> All => _plcs.Values;
-//}
-
-using Snap7ClientLib.Config;
+﻿using Snap7ClientLib.Config;
 using Snap7ClientLib.Tags;
 
 namespace Snap7ClientLib.Core;

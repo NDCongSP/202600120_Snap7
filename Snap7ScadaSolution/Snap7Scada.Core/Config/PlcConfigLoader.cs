@@ -19,7 +19,6 @@ public static class PlcTagConfigLoader
 
         var list = JsonSerializer.Deserialize<List<PlcConfig>>(json, options);
         return list ?? new List<PlcConfig>();
-
     }
 }
 
@@ -45,4 +44,19 @@ public class TagConfig
     public PlcDataType DataType { get; set; }
     public int Length { get; set; }
     public double Deadband { get; set; } = 0;
+
+    /// <summary>
+    /// Cộng vào giá trị của tag rồi trả về.
+    /// </summary>
+    public double Offset { get; set; } = 0;
+
+    /// <summary>
+    /// Nhân vào giá trị của tag rồi trả về.
+    /// </summary>
+    public double GainRate { get; set;} = 1;
+
+    /// <summary>
+    /// Hiển bao nhiêu số lẻ sau dấu chấm.
+    /// </summary>
+    public double NumDecimal { get; set; } = 3;
 }
