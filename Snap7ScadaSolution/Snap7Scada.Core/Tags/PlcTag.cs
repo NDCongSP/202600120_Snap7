@@ -36,4 +36,6 @@ public class PlcTag
     /// Giá trị đọc được / sẽ ghi xuống PLC
     /// </summary>
     public object? Value { get; set; }
+    public object? LastValue { get; set; }
+
 }

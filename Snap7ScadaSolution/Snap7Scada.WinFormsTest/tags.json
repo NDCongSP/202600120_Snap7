@@ -1,29 +1,27 @@
-{
-  "plcs": [
-    {
-      "name": "PLC_1",
-      "host": "192.168.1.100",
-      "rack": 0,
-      "slot": 1,
-      "tags": [
-        {
-          "name": "ScaleValue",
-          "address": "DB1.DBD22",
-          "type": "Real",
-          "deadband": 0.01
-        },
-        {
-          "name": "IsCheck",
-          "address": "DB1.DBX2.0",
-          "type": "Bool"
-        },
-        {
-          "name": "ProductName",
-          "address": "DB1.DBB30",
-          "type": "String",
-          "length": 50
-        }
-      ]
-    }
-  ]
-}
+[
+  {
+    "Name": "PLC_1",
+    "Host": "phucthinhautomation.ddns.net",
+    "Rack": 0,
+    "Slot": 1,
+    "Tags": [
+      {
+        "Name": "ScaleValue",
+        "Address": "DB1.DBD22",
+        "DataType": "Real",
+        "Deadband": 0.01
+      },
+      {
+        "Name": "IsCheck",
+        "Address": "DB1.DBB2",
+        "DataType": "Word"
+      },
+      {
+        "Name": "QrMetal",
+        "Address": "DB1.DBB30",
+        "DataType": "String",
+        "Length": 62
+      }
+    ]
+  }
+]

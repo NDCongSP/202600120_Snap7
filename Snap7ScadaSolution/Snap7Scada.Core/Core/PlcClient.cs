@@ -1,14 +1,11 @@
 ﻿using Sharp7;
-using Snap7Scada.Lib.Core;
 using System.Net;
 
 namespace Snap7ClientLib.Core;
 
 /// <summary>
-/// Lớp quản lý kết nối PLC Snap7
-/// - IP hoặc hostname
-/// - Auto reconnect
-/// - Sync / Async
+/// Client kết nối PLC Siemens S7 (Snap7)
+/// Hỗ trợ sync/async + auto reconnect
 /// </summary>
 public class PlcClient : IDisposable
 {
@@ -16,15 +13,12 @@ public class PlcClient : IDisposable
     private readonly string _host;
     private readonly int _rack;
     private readonly int _slot;
-    private bool _disposed;
+    private Timer? _watchdog;
 
-    public PlcConnectionState State { get; private set; }
-        = PlcConnectionState.Disconnected;
+    public PlcConnectionState State { get; private set; } =
+        PlcConnectionState.Disconnected;
 
-    /// <summary>
-    /// Event thay đổi trạng thái kết nối PLC
-    /// </summary>
-    public event Action<PlcConnectionState>? ConnectionStateChanged;
+    public event Action<PlcConnectionState>? StateChanged;
 
     public PlcClient(string host, int rack = 0, int slot = 1)
     {
@@ -40,12 +34,12 @@ public class PlcClient : IDisposable
     {
         try
         {
-            UpdateState(PlcConnectionState.Connecting);
+            SetState(PlcConnectionState.Connecting);
 
             string ip = ResolveHost(_host);
             int res = _client.ConnectTo(ip, _rack, _slot);
 
-            UpdateState(res == 0
+            SetState(res == 0
                 ? PlcConnectionState.Connected
                 : PlcConnectionState.Error);
 
@@ -53,7 +47,7 @@ public class PlcClient : IDisposable
         }
         catch
         {
-            UpdateState(PlcConnectionState.Error);
+            SetState(PlcConnectionState.Error);
             return false;
         }
     }
@@ -64,30 +58,51 @@ public class PlcClient : IDisposable
     public Task<bool> ConnectAsync()
         => Task.Run(Connect);
 
+    public void Disconnect()
+    {
+        _client.Disconnect();
+        SetState(PlcConnectionState.Disconnected);
+    }
+
     /// <summary>
-    /// Đảm bảo PLC luôn connected
+    /// Tự reconnect khi mất kết nối
     /// </summary>
     public bool EnsureConnected()
-        => _client.Connected || Connect();
+    {
+        if (_client.Connected)
+            return true;
+
+        SetState(PlcConnectionState.Reconnecting);
+        return Connect();
+    }
 
     public Task<bool> EnsureConnectedAsync()
         => Task.Run(EnsureConnected);
 
-    public void Disconnect()
+    /// <summary>
+    /// Watchdog PLC sống
+    /// </summary>
+    public void StartWatchdog(int intervalMs = 2000)
     {
-        if (_client.Connected)
-            _client.Disconnect();
+        _watchdog = new Timer(_ =>
+        {
+            if (!_client.Connected)
+                EnsureConnected();
+        }, null, 0, intervalMs);
+    }
 
-        UpdateState(PlcConnectionState.Disconnected);
+    public void StopWatchdog()
+    {
+        _watchdog?.Dispose();
+        _watchdog = null;
     }
 
     internal S7Client Client => _client;
 
-    private void UpdateState(PlcConnectionState state)
+    private void SetState(PlcConnectionState state)
     {
-        if (State == state) return;
         State = state;
-        ConnectionStateChanged?.Invoke(state);
+        StateChanged?.Invoke(state);
     }
 
     private static string ResolveHost(string host)
@@ -100,8 +115,7 @@ public class PlcClient : IDisposable
 
     public void Dispose()
     {
-        if (_disposed) return;
+        StopWatchdog();
         Disconnect();
-        _disposed = true;
     }
 }
