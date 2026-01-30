@@ -81,6 +81,13 @@ namespace Snap7Scada.WinFormsTest
                     Debug.WriteLine($"{DateTime.Now:O} [{tag.Name}] {tag.LastValue} -> {tag.NewValue} ({tag.DataType}) -> Deadband:{tag.Deadband}");
                 };
             }
+
+
+            _plcRuntime.Tags.FirstOrDefault(t => t.Name == "NewCodeMetal").ValueChanged += (tag) =>
+            {
+                Debug.WriteLine($"{DateTime.Now:O} [{tag.Name}] {tag.LastValue} -> {tag.NewValue} ({tag.DataType}) -> Deadband:{tag.Deadband}");
+            };
+
             // 2) Kết nối PLC, chạy Polling
             await _plc1Client.ConnectAsync();
             _plc1Client.StartWatchdog(2000);
