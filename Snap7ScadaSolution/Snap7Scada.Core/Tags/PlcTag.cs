@@ -37,9 +37,36 @@ public class PlcTag
     internal int Size;     // Số byte cần đọc/ghi
 
     /// <summary>
+    /// Sự kiện riêng cho từng tag
+    /// </summary>
+    public event Action<PlcTag>? ValueChanged;
+
+    /// <summary>
+    /// Phương thức hỗ trợ để kích hoạt sự kiện
+    /// </summary>
+    public void RaiseValueChanged()
+    {
+        ValueChanged?.Invoke(this);
+    }
+
+    private object _newValue;
+
+    /// <summary>
     /// Giá trị đọc được / sẽ ghi xuống PLC
     /// </summary>
-    public object? NewValue { get; set; }
+    public object? NewValue
+    {
+        get => _newValue;
+        set
+        {
+            // So sánh đúng kiểu, có deadband cho số thực (mục 2)
+            if (AreEqual(_newValue, value)) return;
+
+            LastValue = _newValue;
+            _newValue = value;
+            ValueChanged?.Invoke(this);
+        }
+    }
 
     // 1. Thêm LastValue để so sánh hoặc hiển thị lịch sử gần nhất 🔄
     public object? LastValue { get; set; }
@@ -48,6 +75,11 @@ public class PlcTag
     public double OffsetValue { get; set; } = 0;
     public double GainRate { get; set; } = 1;
     public int NumDecimal { get; set; } = 3;
+
+    /// <summary>
+    /// Với tag kiểu số (ví dụ ScaleValue), đọc từ PLC có thể dao động vài đơn vị rất nhỏ dù thực tế “không đổi”. Hãy áp deadband (ngưỡng tối thiểu) trước khi coi là “đổi”.
+    /// </summary>
+    public double Deadband { get; set; } = 0;
 
     /// <summary>
     /// Giá trị thô từ PLC
@@ -87,16 +119,24 @@ public class PlcTag
     // 2. Thêm Status để biết tag có đang kết nối tốt không ✅
     public PlcConnectionState Status { get; set; } = PlcConnectionState.Disconnected;
 
-    /// <summary>
-    /// Sự kiện riêng cho từng tag
-    /// </summary>
-    public event Action<PlcTag>? ValueChanged;
+    private static bool NearlyEqual(double a, double b, double deadband) =>
+     Math.Abs(a - b) <= deadband;
 
-    /// <summary>
-    /// Phương thức hỗ trợ để kích hoạt sự kiện
-    /// </summary>
-    public void RaiseValueChanged()
+    private static bool AreEqual(object a, object b)
     {
-        ValueChanged?.Invoke(this);
+        if (a == null && b == null) return true;
+        if (a == null || b == null) return false;
+
+        // So sánh theo kiểu runtime
+        switch (a)
+        {
+            case double da when b is double db: return NearlyEqual(da, db, deadband: 0.05);
+            case float fa when b is float fb: return Math.Abs(fa - fb) < 0.05f;
+            case decimal ma when b is decimal mb: return ma == mb;
+            case int ia when b is int ib: return ia == ib;
+            case bool ba when b is bool bb: return ba == bb;
+            default: return Equals(a, b); // fallback cho string/bất kỳ
+        }
     }
+
 }

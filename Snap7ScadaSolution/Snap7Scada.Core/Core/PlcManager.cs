@@ -33,7 +33,8 @@ public class PlcManager
                     StringLength = t.Length,
                     OffsetValue = t.OffsetValue,
                     GainRate = t.GainRate,
-                    NumDecimal = t.NumDecimal
+                    NumDecimal = t.NumDecimal,
+                    Deadband = t.Deadband
                 }).ToList()
             };
         }

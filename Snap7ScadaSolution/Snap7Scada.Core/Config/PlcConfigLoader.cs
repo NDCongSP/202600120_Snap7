@@ -36,6 +36,10 @@ public class TagConfig
     public string Address { get; set; } = "";
     public PlcDataType DataType { get; set; }
     public int Length { get; set; }
+
+    /// <summary>
+    /// Với tag kiểu số (ví dụ ScaleValue), đọc từ PLC có thể dao động vài đơn vị rất nhỏ dù thực tế “không đổi”. Hãy áp deadband (ngưỡng tối thiểu) trước khi coi là “đổi”.
+    /// </summary>
     public double Deadband { get; set; } = 0;
 
     /// <summary>
