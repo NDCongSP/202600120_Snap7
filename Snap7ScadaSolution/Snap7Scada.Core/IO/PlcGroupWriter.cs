@@ -30,9 +30,9 @@ public class PlcGroupWriter
         foreach (var tag in tags)
         {
             if (!_lastWritten.TryGetValue(tag.Name, out var old) ||
-                !Equals(old, tag.Value))
+                !Equals(old, tag.NewValue))
             {
-                _lastWritten[tag.Name] = tag.Value;
+                _lastWritten[tag.Name] = tag.NewValue;
                 changed.Add(tag);
             }
         }
@@ -93,13 +93,13 @@ public class PlcGroupWriter
     /// </summary>
     private static void WriteValue(byte[] buffer, int index, PlcTag tag)
     {
-        if (tag.Value == null) return;
+        if (tag.NewValue == null) return;
 
         switch (tag.DataType)
         {
             case PlcDataType.Bool:
                 // Ghi bit bằng mask
-                bool b = Convert.ToBoolean(tag.Value);
+                bool b = Convert.ToBoolean(tag.NewValue);
                 if (b)
                     buffer[index] |= (byte)(1 << tag.Bit);
                 else
@@ -108,50 +108,50 @@ public class PlcGroupWriter
 
             case PlcDataType.Byte:
             case PlcDataType.USInt:
-                buffer[index] = Convert.ToByte(tag.Value);
+                buffer[index] = Convert.ToByte(tag.NewValue);
                 break;
 
             case PlcDataType.SInt:
-                buffer[index] = (byte)Convert.ToSByte(tag.Value);
+                buffer[index] = (byte)Convert.ToSByte(tag.NewValue);
                 break;
 
             case PlcDataType.Char:
-                buffer[index] = (byte)Convert.ToChar(tag.Value);
+                buffer[index] = (byte)Convert.ToChar(tag.NewValue);
                 break;
 
             case PlcDataType.Word:
             case PlcDataType.UInt:
-                S7.SetWordAt(buffer, index, Convert.ToUInt16(tag.Value));
+                S7.SetWordAt(buffer, index, Convert.ToUInt16(tag.NewValue));
                 break;
 
             case PlcDataType.Int:
-                S7.SetIntAt(buffer, index, Convert.ToInt16(tag.Value));
+                S7.SetIntAt(buffer, index, Convert.ToInt16(tag.NewValue));
                 break;
 
             case PlcDataType.DWord:
             case PlcDataType.UDInt:
-                S7.SetDWordAt(buffer, index, Convert.ToUInt32(tag.Value));
+                S7.SetDWordAt(buffer, index, Convert.ToUInt32(tag.NewValue));
                 break;
 
             case PlcDataType.DInt:
-                S7.SetDIntAt(buffer, index, Convert.ToInt32(tag.Value));
+                S7.SetDIntAt(buffer, index, Convert.ToInt32(tag.NewValue));
                 break;
 
             case PlcDataType.Real:
-                S7.SetRealAt(buffer, index, Convert.ToSingle(tag.Value));
+                S7.SetRealAt(buffer, index, Convert.ToSingle(tag.NewValue));
                 break;
 
             case PlcDataType.LWord:
             case PlcDataType.ULInt:
-                S7.SetULintAt(buffer, index, Convert.ToUInt64(tag.Value));
+                S7.SetULintAt(buffer, index, Convert.ToUInt64(tag.NewValue));
                 break;
 
             case PlcDataType.LInt:
-                S7.SetLIntAt(buffer, index, Convert.ToInt64(tag.Value));
+                S7.SetLIntAt(buffer, index, Convert.ToInt64(tag.NewValue));
                 break;
 
             case PlcDataType.LReal:
-                S7.SetLRealAt(buffer, index, Convert.ToDouble(tag.Value));
+                S7.SetLRealAt(buffer, index, Convert.ToDouble(tag.NewValue));
                 break;
 
             case PlcDataType.String:
@@ -165,7 +165,7 @@ public class PlcGroupWriter
     /// </summary>
     private static void WriteString(byte[] buffer, int index, PlcTag tag)
     {
-        string text = tag.Value?.ToString() ?? "";
+        string text = tag.NewValue?.ToString() ?? "";
 
         buffer[index] = (byte)tag.StringLength;
         buffer[index + 1] = (byte)Math.Min(text.Length, tag.StringLength);

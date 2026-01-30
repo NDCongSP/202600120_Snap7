@@ -63,7 +63,7 @@ namespace Snap7Scada.WinFormsTest
             //_sub.Subscribe(plc1.Tags, 200);
 
             foreach (var t in _plcRuntime.Tags)
-                listBox1.Items.Add($"{t.Name} = {t.Value}");
+                listBox1.Items.Add($"{t.Name} = {t.NewValue}");
 
             // Ví dụ đăng ký cho từng tag cụ thể trong Form_Load
             var tagScaleValue = _plcRuntime.Tags.FirstOrDefault(t => t.Name == "ScaleValue");
@@ -71,7 +71,7 @@ namespace Snap7Scada.WinFormsTest
             {
                 tagScaleValue.ValueChanged += (tag) =>
                 {
-                    _scaleValue = $"{tag.Value} (Trước đó: {tag.LastValue})";
+                    _scaleValue = $"{tag.NewValue} (Trước đó: {tag.LastValue})";
                 };
             }
 
@@ -80,7 +80,7 @@ namespace Snap7Scada.WinFormsTest
             {
                 tagIsChecck.ValueChanged += (tag) =>
                 {
-                    _isCheck = $"{tag.Value} (Trước đó: {tag.LastValue})";
+                    _isCheck = $"{tag.NewValue} (Trước đó: {tag.LastValue})";
                 };
             }
 
@@ -127,22 +127,22 @@ namespace Snap7Scada.WinFormsTest
                         {
                             listBox1.Items.Clear();
                             foreach (var t in _manager.GetPlc("PLC_1").Tags)
-                                listBox1.Items.Add($"{t.Name} = {t.Value}");
+                                listBox1.Items.Add($"{t.Name} = {t.NewValue}");
 
-                            label1.Text = $"BoxIdScale: {_plcRuntime.Tags.FirstOrDefault(t => t.Name == "BoxIdScale").Value.ToString()}";
-                            label2.Text = $"BoxIdMetal: {_plcRuntime.Tags.FirstOrDefault(t => t.Name == "BoxIdMetal").Value.ToString()}";
-                            label3.Text = $"ScaleValue: {_plcRuntime.Tags.FirstOrDefault(t => t.Name == "ScaleValue").Value.ToString()}";
+                            label1.Text = $"BoxIdScale: {_plcRuntime.Tags.FirstOrDefault(t => t.Name == "BoxIdScale").NewValue.ToString()}";
+                            label2.Text = $"BoxIdMetal: {_plcRuntime.Tags.FirstOrDefault(t => t.Name == "BoxIdMetal").NewValue.ToString()}";
+                            label3.Text = $"ScaleValue: {_plcRuntime.Tags.FirstOrDefault(t => t.Name == "ScaleValue").NewValue.ToString()}";
                         }));
                     }
                     else
                     {
                         listBox1.Items.Clear();
                         foreach (var t in _manager.GetPlc("PLC_1").Tags)
-                            listBox1.Items.Add($"{t.Name} = {t.Value}");
+                            listBox1.Items.Add($"{t.Name} = {t.NewValue}");
 
-                        label1.Text = $"BoxIdScale: {_plcRuntime.Tags.FirstOrDefault(t => t.Name == "BoxIdScale").Value.ToString()}";
-                        label2.Text = $"BoxIdMetal: {_plcRuntime.Tags.FirstOrDefault(t => t.Name == "BoxIdMetal").Value.ToString()}";
-                        label3.Text = $"ScaleValue: {_plcRuntime.Tags.FirstOrDefault(t => t.Name == "ScaleValue").Value.ToString()}";
+                        label1.Text = $"BoxIdScale: {_plcRuntime.Tags.FirstOrDefault(t => t.Name == "BoxIdScale").NewValue.ToString()}";
+                        label2.Text = $"BoxIdMetal: {_plcRuntime.Tags.FirstOrDefault(t => t.Name == "BoxIdMetal").NewValue.ToString()}";
+                        label3.Text = $"ScaleValue: {_plcRuntime.Tags.FirstOrDefault(t => t.Name == "ScaleValue").NewValue.ToString()}";
                     }
 
                     await Task.Delay(100, token); // nhịp kiểm tra, đủ nhẹ nhàng
@@ -174,7 +174,7 @@ namespace Snap7Scada.WinFormsTest
 
         private void UpdateListBoxItem(PlcTag tag)
         {
-            string itemText = $"{tag.Name} = {tag.Value}";
+            string itemText = $"{tag.Name} = {tag.NewValue}";
             int foundIndex = -1;
 
             // 1. Tìm xem Tag này đã tồn tại trong ListBox chưa
@@ -233,17 +233,17 @@ namespace Snap7Scada.WinFormsTest
 
             // Ghi số thực (Real) - Ví dụ thiết lập ngưỡng cân
             //var tagWeightSet = _plcRuntime.Tags.First(t => t.Name == "ScaleValue");
-            //tagWeightSet.Value = 50.5f; // Gán giá trị mới
+            //tagWeightSet.NewValue = 50.5f; // Gán giá trị mới
             //tagsToWrite.Add(tagWeightSet);
 
             //// Ghi giá trị Logic (Bool) - Ví dụ kích hoạt lệnh Check
             //var tagCheck = _plcRuntime.Tags.First(t => t.Name == "IsCheck");
-            //tagCheck.Value = true;
+            //tagCheck.NewValue = true;
             //tagsToWrite.Add(tagCheck);
 
             //// Ghi chuỗi ký tự (String) - Ví dụ mã QR
             //var tagQr = _plcRuntime.Tags.First(t => t.Name == "BoxIdScale");
-            //tagQr.Value = "S7-1200-OK-2026";
+            //tagQr.NewValue = "S7-1200-OK-2026";
             //tagsToWrite.Add(tagQr);
 
             //// 2. Thực thi ghi xuống PLC bất đồng bộ (không treo UI)
@@ -263,7 +263,7 @@ namespace Snap7Scada.WinFormsTest
             };
 
             // 2. CHỈ GHI TAG ĐANG CHỌN (Tối ưu cực quan trọng)
-            tag.Value = newValue;
+            tag.NewValue = newValue;
             var tagsToWrite = new List<PlcTag> { tag };
 
             try

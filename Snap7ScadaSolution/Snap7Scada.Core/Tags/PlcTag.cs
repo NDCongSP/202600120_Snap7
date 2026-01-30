@@ -39,7 +39,7 @@ public class PlcTag
     /// <summary>
     /// Giá trị đọc được / sẽ ghi xuống PLC
     /// </summary>
-    public object? Value { get; set; }
+    public object? NewValue { get; set; }
 
     // 1. Thêm LastValue để so sánh hoặc hiển thị lịch sử gần nhất 🔄
     public object? LastValue { get; set; }
@@ -70,14 +70,14 @@ public class PlcTag
                 double scaledValue = (rawDouble * GainRate) + OffsetValue;
 
                 // Làm tròn theo số chữ số thập phân cấu hình
-                this.Value = Math.Round(scaledValue, (int)NumDecimal);
+                this.NewValue = Math.Round(scaledValue, (int)NumDecimal);
             }
-            catch { this.Value = raw; } // Nếu lỗi thì trả về giá trị thô
+            catch { this.NewValue = raw; } // Nếu lỗi thì trả về giá trị thô
         }
         else
         {
             // Đối với String hoặc Bool, không áp dụng scaling
-            this.Value = raw;
+            this.NewValue = raw;
         }
 
         // Đảm bảo Status luôn cập nhật là Connected khi có dữ liệu

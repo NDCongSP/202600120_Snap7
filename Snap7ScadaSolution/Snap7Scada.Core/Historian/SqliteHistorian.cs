@@ -50,7 +50,7 @@ public class SqliteHistorian
         """;
 
         cmd.Parameters.AddWithValue("$tag", tag.Name);
-        cmd.Parameters.AddWithValue("$value", tag.Value?.ToString());
+        cmd.Parameters.AddWithValue("$value", tag.NewValue?.ToString());
         cmd.Parameters.AddWithValue("$time", DateTime.Now);
 
         cmd.ExecuteNonQuery();

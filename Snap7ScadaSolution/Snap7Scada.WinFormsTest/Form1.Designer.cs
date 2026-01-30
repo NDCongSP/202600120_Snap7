@@ -128,7 +128,7 @@
             label5.Name = "label5";
             label5.Size = new Size(35, 15);
             label5.TabIndex = 9;
-            label5.Text = "Value";
+            label5.Text = "NewValue";
             // 
             // label6
             // 

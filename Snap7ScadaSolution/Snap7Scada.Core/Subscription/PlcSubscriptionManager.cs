@@ -43,19 +43,19 @@ public class PlcSubscriptionManager
                 if (!_cache.TryGetValue(tag.Name, out var oldVal))
                 {
                     // Nếu lần đầu đọc, lưu vào cache và gán LastValue
-                    _cache[tag.Name] = tag.Value;
-                    tag.LastValue = tag.Value;
+                    _cache[tag.Name] = tag.NewValue;
+                    tag.LastValue = tag.NewValue;
                     continue;
                 }
 
                 // 3. So sánh giá trị mới và cũ
-                if (IsValueChanged(oldVal, tag.Value, tag.DataType))
+                if (IsValueChanged(oldVal, tag.NewValue, tag.DataType))
                 {
                     // Lưu giá trị cũ vào LastValue trước khi cập nhật mới
                     tag.LastValue = oldVal;
 
                     // Cập nhật giá trị mới vào cache
-                    _cache[tag.Name] = tag.Value;
+                    _cache[tag.Name] = tag.NewValue;
 
                     // 4. Kích hoạt sự kiện riêng của chính Tag đó
                     tag.RaiseValueChanged();
@@ -84,19 +84,19 @@ public class PlcSubscriptionManager
                 if (!_cache.TryGetValue(tag.Name, out var oldVal))
                 {
                     // Nếu lần đầu đọc, lưu vào cache và gán LastValue
-                    _cache[tag.Name] = tag.Value;
-                    tag.LastValue = tag.Value;
+                    _cache[tag.Name] = tag.NewValue;
+                    tag.LastValue = tag.NewValue;
                     continue;
                 }
 
                 // 3. So sánh giá trị mới và cũ
-                if (IsValueChanged(oldVal, tag.Value, tag.DataType))
+                if (IsValueChanged(oldVal, tag.NewValue, tag.DataType))
                 {
                     // Lưu giá trị cũ vào LastValue trước khi cập nhật mới
                     tag.LastValue = oldVal;
 
                     // Cập nhật giá trị mới vào cache
-                    _cache[tag.Name] = tag.Value;
+                    _cache[tag.Name] = tag.NewValue;
 
                     // 4. Kích hoạt sự kiện riêng của chính Tag đó
                     tag.RaiseValueChanged();

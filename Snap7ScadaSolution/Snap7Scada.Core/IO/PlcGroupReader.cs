@@ -52,7 +52,7 @@ public class PlcGroupReader
                     foreach (var tag in group)
                     {
                         int index = tag.Offset - min;
-                        //tag.Value = ReadValue(buffer, index, tag);
+                        //tag.NewValue = ReadValue(buffer, index, tag);
 
                         //xử lý lại giá trị của tag trước khi trả về
                         object rawData = ReadValue(buffer, index, tag);
