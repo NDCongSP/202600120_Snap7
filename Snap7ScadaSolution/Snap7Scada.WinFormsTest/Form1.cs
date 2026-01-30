@@ -58,12 +58,10 @@ namespace Snap7Scada.WinFormsTest
 
             await _plcRuntime.Reader.ReadGroupAsync(_plcRuntime.Tags);
 
-            _sub = new PlcSubscriptionManager((_plcRuntime.Reader));
-            _sub.OnValueChanged += Sub_OnValueChanged;//sự kiện trả ra tất cả các tags khi có 1 tag bất kỳ thay đổi giá trị.
-            //_sub.Subscribe(plc1.Tags, 200);
 
-            foreach (var t in _plcRuntime.Tags)
-                listBox1.Items.Add($"{t.Name} = {t.NewValue}");
+            // 1) Tạo và gán handler
+            _sub = new PlcSubscriptionManager(_plcRuntime.Reader);
+            _sub.OnValueChanged += Sub_OnValueChanged;
 
             // Ví dụ đăng ký cho từng tag cụ thể trong Form_Load
             var tagScaleValue = _plcRuntime.Tags.FirstOrDefault(t => t.Name == "ScaleValue");
@@ -71,7 +69,7 @@ namespace Snap7Scada.WinFormsTest
             {
                 tagScaleValue.ValueChanged += (tag) =>
                 {
-                    _scaleValue = $"{tag.NewValue} (Trước đó: {tag.LastValue})";
+                    Debug.WriteLine($"{DateTime.Now:O} [{tag.Name}] {tag.LastValue} -> {tag.NewValue} ({tag.DataType}) -> Deadband:{tag.Deadband}");
                 };
             }
 
@@ -80,32 +78,20 @@ namespace Snap7Scada.WinFormsTest
             {
                 tagIsChecck.ValueChanged += (tag) =>
                 {
-                    _isCheck = $"{tag.NewValue} (Trước đó: {tag.LastValue})";
+                    Debug.WriteLine($"{DateTime.Now:O} [{tag.Name}] {tag.LastValue} -> {tag.NewValue} ({tag.DataType}) -> Deadband:{tag.Deadband}");
                 };
             }
-
-            //// 3. ĐĂNG KÝ TỰ ĐỘNG CHO TẤT CẢ TAG
-            //foreach (var tag in plcData.Tags)
-            //{
-            //    // Khi bất kỳ tag nào đổi giá trị, nó sẽ tự chạy vào đây
-            //    tag.ValueChanged += (updatedTag) =>
-            //    {
-            //        UpdateTagToUI(updatedTag);
-            //    };
-            //}
-
-            // Sau khi đăng ký xong hết mới bắt đầu chạy Polling
+            // 2) Kết nối PLC, chạy Polling
             await _plc1Client.ConnectAsync();
             _plc1Client.StartWatchdog(2000);
 
-            // Chạy vòng lặp Subscription không chặn (Non-blocking)
-            _ = Task.Run(() => _sub.SubscribeAsync(_plcRuntime.Tags, 200));
-
-            // Duyệt qua danh sách tag của PLC để cập nhật UI lần đầu tiên
+            // 3) (Tuỳ chọn) cập nhật UI lần đầu
             foreach (var tag in _plcRuntime.Tags)
-            {
-                tag.RaiseValueChanged(); // 📣 Tự "bắn" sự kiện để UI cập nhật ngay giá trị ban đầu
-            }
+                tag.RaiseValueChanged();//Tự "bắn" sự kiện để UI cập nhật ngay giá trị ban đầu
+
+            // 4) BẮT ĐẦU POLLING (rất quan trọng)
+            _sub.Subscribe(_plcRuntime.Tags, intervalMs: 200);
+
 
             //run thread đọc modbus, để đọc các giá trị cân
             _readModbusCts = new CancellationTokenSource();
@@ -125,9 +111,9 @@ namespace Snap7Scada.WinFormsTest
                     {
                         BeginInvoke((Action)(() =>
                         {
-                            listBox1.Items.Clear();
-                            foreach (var t in _manager.GetPlc("PLC_1").Tags)
-                                listBox1.Items.Add($"{t.Name} = {t.NewValue}");
+                            //listBox1.Items.Clear();
+                            //foreach (var t in _manager.GetPlc("PLC_1").Tags)
+                            //    listBox1.Items.Add($"{t.Name} = {t.NewValue}");
 
                             label1.Text = $"BoxIdScale: {_plcRuntime.Tags.FirstOrDefault(t => t.Name == "BoxIdScale").NewValue.ToString()}";
                             label2.Text = $"BoxIdMetal: {_plcRuntime.Tags.FirstOrDefault(t => t.Name == "BoxIdMetal").NewValue.ToString()}";
@@ -136,9 +122,9 @@ namespace Snap7Scada.WinFormsTest
                     }
                     else
                     {
-                        listBox1.Items.Clear();
-                        foreach (var t in _manager.GetPlc("PLC_1").Tags)
-                            listBox1.Items.Add($"{t.Name} = {t.NewValue}");
+                        //listBox1.Items.Clear();
+                        //foreach (var t in _manager.GetPlc("PLC_1").Tags)
+                        //    listBox1.Items.Add($"{t.Name} = {t.NewValue}");
 
                         label1.Text = $"BoxIdScale: {_plcRuntime.Tags.FirstOrDefault(t => t.Name == "BoxIdScale").NewValue.ToString()}";
                         label2.Text = $"BoxIdMetal: {_plcRuntime.Tags.FirstOrDefault(t => t.Name == "BoxIdMetal").NewValue.ToString()}";
@@ -174,13 +160,14 @@ namespace Snap7Scada.WinFormsTest
 
         private void UpdateListBoxItem(PlcTag tag)
         {
-            string itemText = $"{tag.Name} = {tag.NewValue}";
+            string itemText = $"{DateTime.Now:O} [{tag.Name}] {tag.LastValue} -> {tag.NewValue} ({tag.DataType})";
+
             int foundIndex = -1;
 
             // 1. Tìm xem Tag này đã tồn tại trong ListBox chưa
             for (int i = 0; i < listBox1.Items.Count; i++)
             {
-                if (listBox1.Items[i].ToString().StartsWith(tag.Name + " ="))
+                if (listBox1.Items[i].ToString().Contains(tag.Name))
                 {
                     foundIndex = i;
                     break;

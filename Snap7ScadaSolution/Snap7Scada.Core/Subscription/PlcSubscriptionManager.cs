@@ -1,140 +1,200 @@
-﻿using Snap7ClientLib.Core;
+﻿
+using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using Snap7ClientLib.Core;
 
-namespace Snap7ClientLib.Tags;
-
-/// <summary>
-/// Quản lý subscription tag (polling + event OnValueChanged)
-/// </summary>
-public class PlcSubscriptionManager
+namespace Snap7ClientLib.Tags
 {
-    private readonly PlcGroupReader _reader;
-    private readonly Dictionary<string, object?> _cache = new();
-    private Timer? _timer;
-
     /// <summary>
-    /// Event phát sinh khi giá trị tag thay đổi
+    /// Quản lý subscription tag (polling + event OnValueChanged) – không overlap, hỗ trợ deadband.
+    /// Tương thích .NET Framework/.NET Standard (không dùng PeriodicTimer/ThrowIfNull).
     /// </summary>
-    public event Action<PlcTag>? OnValueChanged;
-
-    public PlcSubscriptionManager(PlcGroupReader reader)
+    public sealed class PlcSubscriptionManager : IDisposable
     {
-        _reader = reader;
-    }
+        private readonly PlcGroupReader _reader;
 
-    /// <summary>
-    /// Bắt đầu subscribe tag
-    /// </summary>
-    /// <param name="intervalMs">Chu kỳ polling (ms)</param>
-    public void Subscribe(IEnumerable<PlcTag> tags, int intervalMs = 200)
-    {
-        // Trong phương thức Subscribe của PlcSubscriptionManager
-        _timer = new Timer(async _ =>
+        // Cache giá trị trước đó theo tên tag
+        private readonly ConcurrentDictionary<string, object?> _cache = new();
+
+        // Vòng đời polling
+        private CancellationTokenSource? _cts;
+        private Task? _loopTask;
+
+        // Cờ chống re-entrancy khi handler có write-back
+        private int _reentrancyGuard = 0;
+
+        /// <summary>Sự kiện khi GIÁ TRỊ tag THỰC SỰ thay đổi (sau so sánh kiểu mạnh + deadband).</summary>
+        public event Action<PlcTag>? OnValueChanged;
+
+        public PlcSubscriptionManager(PlcGroupReader reader)
         {
-            // Đọc dữ liệu từ PLC cho toàn bộ nhóm tag
-            await _reader.ReadGroupAsync(tags);
-
-            foreach (var tag in tags)
-            {
-                // 1. Cập nhật trạng thái kết nối dựa trên kết quả đọc
-                // Giả sử nếu ReadGroup thành công thì Status là Connected
-                tag.Status = PlcConnectionState.Connected;
-
-                // 2. Kiểm tra giá trị cũ trong cache
-                if (!_cache.TryGetValue(tag.Name, out var oldVal))
-                {
-                    // Nếu lần đầu đọc, lưu vào cache và gán LastValue
-                    _cache[tag.Name] = tag.NewValue;
-                    tag.LastValue = tag.NewValue;
-                    continue;
-                }
-
-                // 3. So sánh giá trị mới và cũ
-                if (IsValueChanged(oldVal, tag.NewValue, tag.DataType))
-                {
-                    // Lưu giá trị cũ vào LastValue trước khi cập nhật mới
-                    tag.LastValue = oldVal;
-
-                    // Cập nhật giá trị mới vào cache
-                    _cache[tag.Name] = tag.NewValue;
-
-                    // 4. Kích hoạt sự kiện riêng của chính Tag đó
-                    tag.RaiseValueChanged();
-
-                    // Vẫn kích hoạt sự kiện chung của Manager nếu cần
-                    OnValueChanged?.Invoke(tag);
-                }
-            }
-        }, null, 0, intervalMs);
-    }
-
-    public async Task SubscribeAsync(IEnumerable<PlcTag> tags, int intervalMs = 200, CancellationToken ct = default)
-    {
-        while (!ct.IsCancellationRequested)
-        {
-            // 1. Chờ việc đọc hoàn tất
-            await _reader.ReadGroupAsync(tags);
-
-            foreach (var tag in tags)
-            {
-                // 1. Cập nhật trạng thái kết nối dựa trên kết quả đọc
-                // Giả sử nếu ReadGroup thành công thì Status là Connected
-                tag.Status = PlcConnectionState.Connected;
-
-                // 2. Kiểm tra giá trị cũ trong cache
-                if (!_cache.TryGetValue(tag.Name, out var oldVal))
-                {
-                    // Nếu lần đầu đọc, lưu vào cache và gán LastValue
-                    _cache[tag.Name] = tag.NewValue;
-                    tag.LastValue = tag.NewValue;
-                    continue;
-                }
-
-                // 3. So sánh giá trị mới và cũ
-                if (IsValueChanged(oldVal, tag.NewValue, tag.DataType))
-                {
-                    // Lưu giá trị cũ vào LastValue trước khi cập nhật mới
-                    tag.LastValue = oldVal;
-
-                    // Cập nhật giá trị mới vào cache
-                    _cache[tag.Name] = tag.NewValue;
-
-                    // 4. Kích hoạt sự kiện riêng của chính Tag đó
-                    tag.RaiseValueChanged();
-
-                    // Vẫn kích hoạt sự kiện chung của Manager nếu cần
-                    OnValueChanged?.Invoke(tag);
-                }
-            }
-
-            // 2. Nghỉ đúng khoảng interval rồi mới lặp lại
-            await Task.Delay(intervalMs, ct);
+            if (reader == null) throw new ArgumentNullException(nameof(reader));
+            _reader = reader;
         }
-    }
 
-    /// <summary>
-    /// So sánh giá trị cũ/mới (có deadband cho float)
-    /// </summary>
-    private static bool IsValueChanged(object? oldVal, object? newVal, PlcDataType type)
-    {
-        if (oldVal == null || newVal == null) return true;
-
-        return type switch
+        /// <summary>Bắt đầu subscribe các tag theo chu kỳ (ms). Nếu đang chạy sẽ dừng phiên cũ và chạy lại.</summary>
+        public void Subscribe(IEnumerable<PlcTag> tags, int intervalMs = 200)
         {
-            // Sử dụng Convert.ToDouble để an toàn cho cả float và double
-            PlcDataType.Real or PlcDataType.LReal =>
-                Math.Abs(Convert.ToDouble(oldVal) - Convert.ToDouble(newVal)) > 0.0001,
+            if (tags == null) throw new ArgumentNullException(nameof(tags));
+            if (intervalMs <= 0) throw new ArgumentOutOfRangeException(nameof(intervalMs));
 
-            _ => !Equals(oldVal, newVal)
-        };
-    }
+            // Dừng phiên cũ (nếu có)
+            Stop();
 
-    /// <summary>
-    /// Dừng subscription
-    /// </summary>
-    public void Stop()
-    {
-        _timer?.Dispose();
-        _timer = null;
-        _cache.Clear();
+            // "Đóng băng" danh sách để tránh bị sửa bên ngoài / enumerate nhiều lần
+            var tagList = tags.Where(t => t != null).Distinct().ToList();
+            if (tagList.Count == 0) return;
+
+            _cache.Clear();
+
+            _cts = new CancellationTokenSource();
+            _loopTask = Task.Run(() => RunLoopAsync(tagList, intervalMs, _cts.Token));
+        }
+
+        private async Task RunLoopAsync(IReadOnlyList<PlcTag> tags, int intervalMs, CancellationToken ct)
+        {
+            // Lần đầu: seed cache KHÔNG raise
+            await SafeReadAndProcessAsync(tags, raiseChanges: false, ct).ConfigureAwait(false);
+
+            while (!ct.IsCancellationRequested)
+            {
+                await SafeReadAndProcessAsync(tags, raiseChanges: true, ct).ConfigureAwait(false);
+
+                try
+                {
+                    await Task.Delay(intervalMs, ct).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                {
+                    // bình thường khi Stop()
+                }
+            }
+        }
+
+        /// <summary>Đọc nhóm & xử lý thay đổi; có thể chọn raise hay chỉ seed.</summary>
+        private async Task SafeReadAndProcessAsync(IReadOnlyList<PlcTag> tags, bool raiseChanges, CancellationToken ct)
+        {
+            try
+            {
+                // PlcGroupReader hiện tại của anh không nhận CancellationToken
+                await _reader.ReadGroupAsync(tags).ConfigureAwait(false);
+                var readOk = true;
+
+                foreach (var tag in tags)
+                {
+                    // Trạng thái cơ bản
+                    tag.Status = readOk ? PlcConnectionState.Connected : PlcConnectionState.Disconnected;
+
+                    var newVal = tag.NewValue;
+
+                    // Seed cache lần đầu
+                    if (!_cache.TryGetValue(tag.Name, out var oldVal))
+                    {
+                        _cache[tag.Name] = newVal;
+                        tag.LastValue = newVal;
+                        continue;
+                    }
+
+                    //bool changed = IsValueChanged(oldVal, newVal, tag);
+                    //System.Diagnostics.Debug.WriteLine(
+                    //    $"[{tag.Name}] old={(oldVal ?? "null")} new={(newVal ?? "null")} type={tag.DataType} changed={changed}");
+
+                    // So sánh kiểu mạnh + deadband
+                    if (IsValueChanged(oldVal, newVal, tag))
+                    {
+                        tag.LastValue = oldVal;
+                        _cache[tag.Name] = newVal;
+
+                        if (raiseChanges)
+                        {
+                            if (Interlocked.CompareExchange(ref _reentrancyGuard, 1, 0) == 0)
+                            {
+                                try
+                                {
+                                    tag.RaiseValueChanged();     // event riêng của Tag (nếu có)
+                                    OnValueChanged?.Invoke(tag); // event Manager
+                                }
+                                finally
+                                {
+                                    Interlocked.Exchange(ref _reentrancyGuard, 0);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                // bình thường khi Stop()
+            }
+            catch (Exception)
+            {
+                // Lỗi đọc: đánh dấu Disconnected; có thể log nếu cần
+                foreach (var tag in tags)
+                    tag.Status = PlcConnectionState.Disconnected;
+                // TODO: Logger.LogError(ex, "Read/process failed");
+            }
+        }
+
+        /// <summary>So sánh giá trị cũ/mới, có deadband cho số thực. Hỗ trợ deadband per-tag nếu có thuộc tính.</summary>
+        private static bool IsValueChanged(object? oldVal, object? newVal, PlcTag tag)
+        {
+            // Một trong hai null → xem như thay đổi
+            if (oldVal == null || newVal == null) return true;
+
+            switch (tag.DataType)
+            {
+                case PlcDataType.Bool:
+                    return !Equals(Convert.ToBoolean(oldVal), Convert.ToBoolean(newVal));
+
+                case PlcDataType.Int:     // Int16
+                case PlcDataType.DInt:    // Int32
+                case PlcDataType.LInt:    // Int64
+                case PlcDataType.UInt:
+                case PlcDataType.UDInt:
+                case PlcDataType.ULInt:
+                case PlcDataType.Byte:
+                case PlcDataType.Word:
+                case PlcDataType.DWord:
+                case PlcDataType.LWord:
+                    return !Equals(Convert.ToInt64(oldVal), Convert.ToInt64(newVal));
+
+                case PlcDataType.Real:    // float
+                case PlcDataType.LReal:   // double
+                    {
+                        // Nếu PlcTag có property Deadband (>0) thì dùng; không thì mặc định.
+                        double defaultBand = tag.DataType == PlcDataType.Real ? 1e-4 : 1e-6;
+                        double band = (tag.Deadband > 0) ? tag.Deadband : defaultBand;
+
+                        double o = Convert.ToDouble(oldVal);
+                        double n = Convert.ToDouble(newVal);
+                        return Math.Abs(o - n) > band;
+                    }
+
+                default:
+                    // Fallback cho string/khác
+                    return !Equals(oldVal, newVal);
+            }
+        }
+
+        /// <summary>Dừng subscription hiện tại.</summary>
+        public void Stop()
+        {
+            _cts?.Cancel();
+
+            try { _loopTask?.Wait(); } catch { /* ignore */ }
+            _loopTask = null;
+
+            _cts?.Dispose();
+            _cts = null;
+
+            _cache.Clear();
+        }
+
+        public void Dispose() => Stop();
     }
 }

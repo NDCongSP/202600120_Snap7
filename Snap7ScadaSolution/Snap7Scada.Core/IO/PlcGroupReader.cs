@@ -59,8 +59,8 @@ public class PlcGroupReader
                         // Gọi hàm xử lý để tính toán Gain/Offset
                         tag.ApplyScaling(rawData);
 
-                        // Kích hoạt sự kiện để WinForm cập nhật UI
-                        tag.RaiseValueChanged();
+                        //// Kích hoạt sự kiện để WinForm cập nhật UI
+                        //tag.RaiseValueChanged();
                     }
                 }
             }

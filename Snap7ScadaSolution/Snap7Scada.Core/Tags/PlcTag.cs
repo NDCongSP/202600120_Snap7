@@ -59,12 +59,12 @@ public class PlcTag
         get => _newValue;
         set
         {
-            // So sánh đúng kiểu, có deadband cho số thực (mục 2)
-            if (AreEqual(_newValue, value)) return;
+            //// So sánh đúng kiểu, có deadband cho số thực (mục 2)
+            //if (AreEqual(_newValue, value)) return;
 
             LastValue = _newValue;
             _newValue = value;
-            ValueChanged?.Invoke(this);
+            //ValueChanged?.Invoke(this);
         }
     }
 
