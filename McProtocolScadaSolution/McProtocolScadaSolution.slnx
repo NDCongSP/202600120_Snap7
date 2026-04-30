@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="McProtocolScada.Core/McProtocolScada.Lib.csproj" />
+  <Project Path="McProtocolScada.WinFormsTest/McProtocolScada.WinFormsTest.csproj" />
+</Solution>
