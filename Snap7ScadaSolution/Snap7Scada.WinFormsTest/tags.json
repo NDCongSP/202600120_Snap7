@@ -1,82 +1,43 @@
 [
   {
     "Name": "PLC_1",
-    "Host": "phucthinhautomation.ddns.net",
+    "Host": "192.168.1.100",
     "Rack": 0,
     "Slot": 1,
     "Tags": [
       {
-        "Name": "BoxIdScale",
-        "Address": "DB1.DBB30",
-        "DataType": "String",
-        "Length": 62
-      },
-      {
-        "Name": "BoxIdMetal",
-        "Address": "DB1.DBB96",
-        "DataType": "String",
-        "Length": 62
-      },
-      {
-        "Name": "PrintContentLine1",
-        "Address": "DB1.DBB162",
-        "DataType": "String",
-        "Length": 62
-      },
-      {
-        "Name": "PrintContentLine2",
-        "Address": "DB1.DBB228",
-        "DataType": "String",
-        "Length": 62
-      },
-      {
-        "Name": "PrintContentLine3",
-        "Address": "DB1.DBB294",
-        "DataType": "String",
-        "Length": 62
-      },
-      {
-        "Name": "NewCodeMetal",
+        "Name": "S1",
         "Address": "DB1.DBB0",
         "DataType": "Word"
       },
       {
-        "Name": "IsCheck",
+        "Name": "RJ1",
+        "Address": "DB1.DBB14",
+        "DataType": "Word"
+      },
+        {
+        "Name": "S2",
         "Address": "DB1.DBB2",
         "DataType": "Word"
       },
       {
-        "Name": "ResultCheckMetal",
+        "Name": "METAL_RESULT",
+        "Address": "DB1.DBB10",
+        "DataType": "Word"
+      },
+        {
+        "Name": "S_MD_OUT",
         "Address": "DB1.DBB4",
         "DataType": "Word"
       },
-      {
-        "Name": "NewCodeScale",
+       {
+        "Name": "S5",
         "Address": "DB1.DBB6",
         "DataType": "Word"
       },
       {
-        "Name": "StableTrigger",
-        "Address": "DB1.DBB8",
-        "DataType": "Word"
-      },
-      {
-        "Name": "WeightCheckDone",
-        "Address": "DB1.DBB10",
-        "DataType": "Word"
-      },
-      {
-        "Name": "ScaleValue",
-        "Address": "DB1.DBD22",
-        "DataType": "Real",
-        "Deadband": 0.01,
-        "OffsetValue": 0,
-        "GainRate": 1,
-        "NumDecimal": 2
-      },
-      {
-        "Name": "StableSccaleValue",
-        "Address": "DB1.DBB26",
+        "Name": "Scale_Value",
+        "Address": "DB1.DBB24",
         "DataType": "Real",
         "Deadband": 0.01,
         "OffsetValue": 0,
@@ -84,13 +45,29 @@
         "NumDecimal": 1
       },
       {
-        "Name": "StandardGrossWeight",
+        "Name": "Scale_Stable_Trigger",
         "Address": "DB1.DBB12",
+        "DataType": "Word"
+      },
+      {
+        "Name": "StableSccaleValue",
+        "Address": "DB1.DBB28",
         "DataType": "Real",
         "Deadband": 0.01,
         "OffsetValue": 0,
         "GainRate": 1
+      },
+    {
+        "Name": "Check_Weight_Result",
+        "Address": "DB1.DBB20",
+        "DataType": "Word"
+      },
+       {
+        "Name": "S6",
+        "Address": "DB1.DBB22",
+        "DataType": "Word"
       }
+
     ]
   }
 ]

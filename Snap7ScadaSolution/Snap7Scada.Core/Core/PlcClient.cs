@@ -18,7 +18,7 @@ namespace Snap7ClientLib.Core
         public readonly object SyncLock = new object(); // Khóa dùng chung cho cả Read và Write
 
         private readonly S7Client _client = new();
-        private readonly string _host;
+        private  string _host;
         private readonly int _rack;
         private readonly int _slot;
 
@@ -29,6 +29,18 @@ namespace Snap7ClientLib.Core
             PlcConnectionState.Disconnected;
 
         public event Action<PlcConnectionState>? StateChanged;
+
+        public string Host
+        {
+            get=>_host;
+            set
+            {
+                if (State == PlcConnectionState.Connected)
+                    throw new InvalidOperationException("Không thể thay đổi Host khi đang kết nối.");
+                _host = value;
+            }
+        }
+
 
         public PlcClient(string host, int rack = 0, int slot = 1)
         {

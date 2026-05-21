@@ -63,30 +63,32 @@ namespace Snap7Scada.WinFormsTest
             _sub = new PlcSubscriptionManager(_plcRuntime.Reader);
             _sub.OnValueChanged += Sub_OnValueChanged;
 
-            // Ví dụ đăng ký cho từng tag cụ thể trong Form_Load
-            var tagScaleValue = _plcRuntime.Tags.FirstOrDefault(t => t.Name == "ScaleValue");
-            if (tagScaleValue != null)
-            {
-                tagScaleValue.ValueChanged += (tag) =>
-                {
-                    Debug.WriteLine($"{DateTime.Now:O} [{tag.Name}] {tag.LastValue} -> {tag.NewValue} ({tag.DataType}) -> Deadband:{tag.Deadband}");
-                };
-            }
-
-            var tagIsChecck = _plcRuntime.Tags.FirstOrDefault(t => t.Name == "IsCheck");
-            if (tagIsChecck != null)
-            {
-                tagIsChecck.ValueChanged += (tag) =>
-                {
-                    Debug.WriteLine($"{DateTime.Now:O} [{tag.Name}] {tag.LastValue} -> {tag.NewValue} ({tag.DataType}) -> Deadband:{tag.Deadband}");
-                };
-            }
 
 
-            _plcRuntime.Tags.FirstOrDefault(t => t.Name == "NewCodeMetal").ValueChanged += (tag) =>
-            {
-                Debug.WriteLine($"{DateTime.Now:O} [{tag.Name}] {tag.LastValue} -> {tag.NewValue} ({tag.DataType}) -> Deadband:{tag.Deadband}");
-            };
+            //// Ví dụ đăng ký cho từng tag cụ thể trong Form_Load
+            //var tagScaleValue = _plcRuntime.Tags.FirstOrDefault(t => t.Name == "ScaleValue");
+            //if (tagScaleValue != null)
+            //{
+            //    tagScaleValue.ValueChanged += (tag) =>
+            //    {
+            //        Debug.WriteLine($"{DateTime.Now:O} [{tag.Name}] {tag.LastValue} -> {tag.NewValue} ({tag.DataType}) -> Deadband:{tag.Deadband}");
+            //    };
+            //}
+
+            //var tagIsChecck = _plcRuntime.Tags.FirstOrDefault(t => t.Name == "IsCheck");
+            //if (tagIsChecck != null)
+            //{
+            //    tagIsChecck.ValueChanged += (tag) =>
+            //    {
+            //        Debug.WriteLine($"{DateTime.Now:O} [{tag.Name}] {tag.LastValue} -> {tag.NewValue} ({tag.DataType}) -> Deadband:{tag.Deadband}");
+            //    };
+            //}
+
+
+            //_plcRuntime.Tags.FirstOrDefault(t => t.Name == "NewCodeMetal").ValueChanged += (tag) =>
+            //{
+            //    Debug.WriteLine($"{DateTime.Now:O} [{tag.Name}] {tag.LastValue} -> {tag.NewValue} ({tag.DataType}) -> Deadband:{tag.Deadband}");
+            //};
 
             // 2) Kết nối PLC, chạy Polling
             await _plc1Client.ConnectAsync();
@@ -106,6 +108,7 @@ namespace Snap7Scada.WinFormsTest
 
             _cbTagName.Items.AddRange(_plcRuntime.Tags.Select(x => x.Name).ToArray());
 
+            label1.Text = $"IP server: {_plc1Client.Host}";
         }
 
         public async Task TaskReadPlcAsync(CancellationToken token)
@@ -114,31 +117,37 @@ namespace Snap7Scada.WinFormsTest
             {
                 try
                 {
-                    if (InvokeRequired)
+                    foreach (var item in _plcRuntime.Tags)
                     {
-                        BeginInvoke((Action)(() =>
+                        if (InvokeRequired)
+                        {
+                            BeginInvoke((Action)(() =>
+                            {
+                                //listBox1.Items.Clear();
+                                //foreach (var t in _manager.GetPlc("PLC_1").Tags)
+                                //    listBox1.Items.Add($"{t.Name} = {t.NewValue}");
+
+                                //label1.Text = $"BoxIdScale: {_plcRuntime.Tags.FirstOrDefault(t => t.Name == "BoxIdScale").NewValue.ToString()}";
+                                //label2.Text = $"BoxIdMetal: {_plcRuntime.Tags.FirstOrDefault(t => t.Name == "BoxIdMetal").NewValue.ToString()}";
+                                //label3.Text = $"ScaleValue: {_plcRuntime.Tags.FirstOrDefault(t => t.Name == "ScaleValue").NewValue.ToString()}";
+
+                                UpdateListBoxItem(item);
+                            }));
+                        }
+                        else
                         {
                             //listBox1.Items.Clear();
                             //foreach (var t in _manager.GetPlc("PLC_1").Tags)
                             //    listBox1.Items.Add($"{t.Name} = {t.NewValue}");
 
-                            label1.Text = $"BoxIdScale: {_plcRuntime.Tags.FirstOrDefault(t => t.Name == "BoxIdScale").NewValue.ToString()}";
-                            label2.Text = $"BoxIdMetal: {_plcRuntime.Tags.FirstOrDefault(t => t.Name == "BoxIdMetal").NewValue.ToString()}";
-                            label3.Text = $"ScaleValue: {_plcRuntime.Tags.FirstOrDefault(t => t.Name == "ScaleValue").NewValue.ToString()}";
-                        }));
-                    }
-                    else
-                    {
-                        //listBox1.Items.Clear();
-                        //foreach (var t in _manager.GetPlc("PLC_1").Tags)
-                        //    listBox1.Items.Add($"{t.Name} = {t.NewValue}");
-
-                        label1.Text = $"BoxIdScale: {_plcRuntime.Tags.FirstOrDefault(t => t.Name == "BoxIdScale").NewValue.ToString()}";
-                        label2.Text = $"BoxIdMetal: {_plcRuntime.Tags.FirstOrDefault(t => t.Name == "BoxIdMetal").NewValue.ToString()}";
-                        label3.Text = $"ScaleValue: {_plcRuntime.Tags.FirstOrDefault(t => t.Name == "ScaleValue").NewValue.ToString()}";
+                            //label1.Text = $"BoxIdScale: {_plcRuntime.Tags.FirstOrDefault(t => t.Name == "BoxIdScale").NewValue.ToString()}";
+                            //label2.Text = $"BoxIdMetal: {_plcRuntime.Tags.FirstOrDefault(t => t.Name == "BoxIdMetal").NewValue.ToString()}";
+                            //label3.Text = $"ScaleValue: {_plcRuntime.Tags.FirstOrDefault(t => t.Name == "ScaleValue").NewValue.ToString()}";
+                            UpdateListBoxItem(item);
+                        }
                     }
 
-                    await Task.Delay(100, token); // nhịp kiểm tra, đủ nhẹ nhàng
+                    await Task.Delay(3000, token); // nhịp kiểm tra, đủ nhẹ nhàng
                 }
                 catch (OperationCanceledException)
                 {
