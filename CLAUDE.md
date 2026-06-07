@@ -248,10 +248,9 @@ active_context:
     - "String byte order: LOW_BYTE=ký tự đầu, KHÔNG swap — confirmed"
     - "Pingable dùng ICMP — không tạo TCP connection vào port MC Protocol"
   next_steps:
-    - "1. Xóa TestRawAsync debug code khỏi Form1.cs và PlcClient.cs khi production"
-    - "2. Test Write tag từ WinForms button → verify PLC nhận đúng"
-    - "3. Kiểm tra reconnect tự động sau mất kết nối (EnsureConnected fix)"
-    - "4. Wire SqliteHistorian vào Form1 nếu cần lưu lịch sử"
+    - "1. Test Write tag từ WinForms button → verify PLC nhận đúng (chọn tag, nhập giá trị, bấm Write)"
+    - "2. Kiểm tra reconnect tự động sau mất kết nối (rút cáp → cắm lại → lblStatus phải về Connected)"
+    - "3. (Optional) Verify plc_history.db được tạo và ghi dữ liệu đúng sau khi chạy"
   last_session:   "2026-06-07"
   open_questions: []
   simulator_note: >
@@ -285,6 +284,18 @@ Khi bắt đầu session mới, Claude PHẢI:
 
 > Format: `[YYYY-MM-DD] [TYPE] [File/Module] — Mô tả`  
 > Types: `FEAT` · `FIX` · `REFACTOR` · `PERF` · `TEST` · `DOCS` · `CHORE` · `BREAK`
+
+---
+
+### [2026-06-07] — Session 4 (Cleanup debug code + SqliteHistorian wiring)
+
+```
+[CHORE] McProtocolScada.WinFormsTest/Form1.cs           — Xóa TestRawAsync debug MessageBox (production ready)
+[FIX]   McProtocolScada.WinFormsTest/Form1.cs           — AttachTagDebug: sửa tag name "Step_Run"→"StepRun", "PartCode"→"Part" (khớp tags.json)
+[FIX]   McProtocolScada.WinFormsTest/Form1.cs           — StepRun.ValueChanged: bọc null-check tránh NullReferenceException khi tag không tồn tại
+[FEAT]  McProtocolScada.WinFormsTest/Form1.cs           — Wire SqliteHistorian: tạo _historian field, init "plc_history.db", ghi async trong Sub_OnValueChanged
+[DOCS]  CLAUDE.md                                        — Cập nhật next_steps, Build: 0 error 0 warning xác nhận
+```
 
 ---
 

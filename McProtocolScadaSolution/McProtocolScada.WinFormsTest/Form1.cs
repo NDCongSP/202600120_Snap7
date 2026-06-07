@@ -15,6 +15,7 @@ namespace McProtocolScada.WinFormsTest
 
         private CancellationTokenSource? _readCts;
         private Task? _readTask;
+        private SqliteHistorian? _historian;
 
         // Throttle thông báo lỗi để không spam MessageBox/log
         private DateTime _lastErrorShownAt = DateTime.MinValue;
@@ -43,11 +44,6 @@ namespace McProtocolScada.WinFormsTest
             {
                 _manager.LoadFromConfig("tags.json");
 
-                // DEBUG: raw socket test — xác nhận C# frame có hoạt động không
-                var rawResult = await PlcClient.TestRawAsync("192.168.11.3", 8000);
-                MessageBox.Show(rawResult, "Raw MC Test", MessageBoxButtons.OK,
-                    rawResult.StartsWith("Raw OK") ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
-
                 _plcRuntime = _manager.GetPlc("PLC_1");
                 _plc1Client = _plcRuntime.Client;
 
@@ -61,10 +57,11 @@ namespace McProtocolScada.WinFormsTest
                 // 1) Tạo handler subscription trước
                 _sub = new PlcSubscriptionManager(_plcRuntime.Reader);
                 _sub.OnValueChanged += Sub_OnValueChanged;
+                _historian = new SqliteHistorian("plc_history.db");
 
                 // 2) Đăng ký event cho từng tag cụ thể (nếu có)
-                AttachTagDebug("Step_Run");
-                AttachTagDebug("PartCode");
+                AttachTagDebug("StepRun");
+                AttachTagDebug("Part");
                 AttachTagDebug("PartName");
 
                 // 3) Kết nối PLC + Watchdog (KHÔNG block UI nếu fail)
@@ -86,20 +83,15 @@ namespace McProtocolScada.WinFormsTest
                     foreach (var tag in _plcRuntime.Tags)
                         tag.RaiseValueChanged();
 
-                    _plcRuntime.Tags.FirstOrDefault(x=>x.Name== "StepRun").ValueChanged += (t) =>
-                    {
-                        if (this.InvokeRequired)
+                    var stepRunTag = _plcRuntime.Tags.FirstOrDefault(x => x.Name == "StepRun");
+                    if (stepRunTag != null)
+                        stepRunTag.ValueChanged += (t) =>
                         {
-                            label1.Invoke(()=>
-                            {
+                            if (InvokeRequired)
+                                label1.Invoke(() => label1.Text = $"[Event] StepRun changed: {t.LastValue} -> {t.NewValue}");
+                            else
                                 label1.Text = $"[Event] StepRun changed: {t.LastValue} -> {t.NewValue}";
-                            });
-                        }
-                        else
-                        {
-                            label1.Text = $"[Event] StepRun changed: {t.LastValue} -> {t.NewValue}";
-                        }
-                    };
+                        };
                 }
 
                 // 5) Bắt đầu polling subscription
@@ -189,6 +181,8 @@ namespace McProtocolScada.WinFormsTest
 
         private void Sub_OnValueChanged(PlcTag tag)
         {
+            _ = Task.Run(() => _historian?.Log(tag));
+
             if (!IsHandleCreated) return;
             if (InvokeRequired)
                 BeginInvoke(new Action(() => UpdateListBoxItem(tag)));
