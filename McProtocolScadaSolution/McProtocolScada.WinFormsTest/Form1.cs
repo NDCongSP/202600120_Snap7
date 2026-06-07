@@ -43,6 +43,11 @@ namespace McProtocolScada.WinFormsTest
             {
                 _manager.LoadFromConfig("tags.json");
 
+                // DEBUG: raw socket test — xác nhận C# frame có hoạt động không
+                var rawResult = await PlcClient.TestRawAsync("192.168.11.3", 8000);
+                MessageBox.Show(rawResult, "Raw MC Test", MessageBoxButtons.OK,
+                    rawResult.StartsWith("Raw OK") ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
+
                 _plcRuntime = _manager.GetPlc("PLC_1");
                 _plc1Client = _plcRuntime.Client;
 
@@ -72,7 +77,7 @@ namespace McProtocolScada.WinFormsTest
                 {
                     ShowErrorOnce($"Connect PLC failed: {ex.Message}");
                 }
-                _plc1Client.StartWatchdog(2000);
+                _plc1Client.StartWatchdog(10000);
 
                 // 4) Đọc lần đầu (đã có try/catch trong Reader → không crash)
                 if (connected)
@@ -80,6 +85,21 @@ namespace McProtocolScada.WinFormsTest
                     await _plcRuntime.Reader.ReadGroupAsync(_plcRuntime.Tags);
                     foreach (var tag in _plcRuntime.Tags)
                         tag.RaiseValueChanged();
+
+                    _plcRuntime.Tags.FirstOrDefault(x=>x.Name== "StepRun").ValueChanged += (t) =>
+                    {
+                        if (this.InvokeRequired)
+                        {
+                            label1.Invoke(()=>
+                            {
+                                label1.Text = $"[Event] StepRun changed: {t.LastValue} -> {t.NewValue}";
+                            });
+                        }
+                        else
+                        {
+                            label1.Text = $"[Event] StepRun changed: {t.LastValue} -> {t.NewValue}";
+                        }
+                    };
                 }
 
                 // 5) Bắt đầu polling subscription
@@ -122,24 +142,39 @@ namespace McProtocolScada.WinFormsTest
             {
                 try
                 {
-                    Action update = () =>
-                    {
-                        var boxIdScale = _plcRuntime.Tags.FirstOrDefault(t => t.Name == "BoxIdScale");
-                        var boxIdMetal = _plcRuntime.Tags.FirstOrDefault(t => t.Name == "BoxIdMetal");
-                        var scaleValue = _plcRuntime.Tags.FirstOrDefault(t => t.Name == "ScaleValue");
+                    //Action update = () =>
+                    //{
+                    //    var boxIdScale = _plcRuntime.Tags.FirstOrDefault(t => t.Name == "BoxIdScale");
+                    //    var boxIdMetal = _plcRuntime.Tags.FirstOrDefault(t => t.Name == "BoxIdMetal");
+                    //    var scaleValue = _plcRuntime.Tags.FirstOrDefault(t => t.Name == "ScaleValue");
 
-                        label1.Text = $"BoxIdScale: {boxIdScale?.NewValue}";
-                        label2.Text = $"BoxIdMetal: {boxIdMetal?.NewValue}";
-                        label3.Text = $"ScaleValue: {scaleValue?.NewValue}";
-                    };
+                    //    label1.Text = $"BoxIdScale: {boxIdScale?.NewValue}";
+                    //    label2.Text = $"BoxIdMetal: {boxIdMetal?.NewValue}";
+                    //    label3.Text = $"ScaleValue: {scaleValue?.NewValue}";
+                    //};
+
+                    foreach (var item in _plcRuntime.Tags)
+                    {
+                        if (InvokeRequired)
+                        {
+                            BeginInvoke((Action)(() =>
+                            {
+                                UpdateListBoxItem(item);
+                            }));
+                        }
+                        else
+                        {
+                            UpdateListBoxItem(item);
+                        }
+                    }
 
                     if (IsHandleCreated)
                     {
-                        if (InvokeRequired) BeginInvoke(update);
-                        else update();
+                        //if (InvokeRequired) BeginInvoke(update);
+                        //else update();
                     }
 
-                    await Task.Delay(100, token);
+                    await Task.Delay(1000, token);
                 }
                 catch (OperationCanceledException)
                 {
@@ -256,7 +291,7 @@ namespace McProtocolScada.WinFormsTest
                 object newValue = tag.DataType switch
                 {
                     PlcDataType.String => _txtNewValue.Text,
-                    PlcDataType.Bool   => _txtNewValue.Text.ToLower() == "true" || _txtNewValue.Text == "1",
+                    PlcDataType.Bool => _txtNewValue.Text.ToLower() == "true" || _txtNewValue.Text == "1",
                     PlcDataType.Real or PlcDataType.LReal
                         => double.TryParse(_txtNewValue.Text, out var d) ? d : 0.0,
                     _ => int.TryParse(_txtNewValue.Text, out var i) ? i : 0

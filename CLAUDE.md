@@ -220,16 +220,17 @@ var wordCount = (StringLength + 1) / 2; // chia StringLength+1 cho 2
 ```yaml
 active_context:
   current_task: >
-    Build clean, tags.json hoàn chỉnh 42 tags (D4000–D4067).
-    Sẵn sàng test kết nối GX Simulator.
+    Driver hoạt động OK với PLC thật Q06UDV: đọc 19 tags, subscription event, PartName String.
+    Tiếp theo: xóa debug code, test Write, wire SqliteHistorian.
   branch:         "PLC_Mitsubishi_MC_Protocol_Dev"
   plc_hardware:
     series:        "Mitsubishi MELSEC-Q"
     model:         "Q06UDV (QCPU Q mode)"
-    ip:            "192.168.11.1"
-    port:          6000
+    ip:            "192.168.11.3"
+    port:          8000
     frame:         "QnA3E_Binary (Binary Code)"
-    simulator:     "GX Works2/GX Simulator, IP 192.168.11.1"
+    station:       0
+    note:          "Port 8000 = MC Protocol (Open Setting Line 2). Station=0 trong tags.json (NetworkStationNumber=0xFF gây timeout). Pingable dùng ICMP tránh làm đầy connection table Q series (~8 slots)."
   related_files:
     - "McProtocolScadaSolution/McProtocolScada.Core/Core/PlcClient.cs"
     - "McProtocolScadaSolution/McProtocolScada.Core/IO/PlcGroupReader.cs"
@@ -239,23 +240,20 @@ active_context:
     - "McProtocolScadaSolution/McProtocolScada.WinFormsTest/Form1.cs"
     - "McProtocolScadaSolution/McProtocolScada.WinFormsTest/tags.json"
   verified_ok:
-    - "Build: 0 error, 0 warning (2026-06-07)"
+    - "Build: 0 error (2026-06-07)"
+    - "PlcClient kết nối OK: Q06UDV 192.168.11.3:8000, QnA3E_Binary, Station=0"
+    - "Read thành công: Part=546, PartName=CW180-WS-1(String), StepRun event OK"
+    - "Subscription polling 200ms hoạt động, OnValueChanged event đúng"
     - "PlcAddressParser: D/M/X(HEX)/Y(HEX)/B(HEX)/ZR/D100.5 logic đúng"
-    - "PlcGroupReader: batch read, block split, bit-in-word decode đúng"
-    - "PlcGroupWriter: RMW cho bit-in-word đúng (little-endian HslComm)"
-    - "PlcClient: QnA3E_Binary port 6000 đúng cho Q06UDV"
     - "String byte order: LOW_BYTE=ký tự đầu, KHÔNG swap — confirmed"
-    - "tags.json: 42 tags D4000–D4067 (PartName/Work=String×20, DWord×Gain, Word)"
+    - "Pingable dùng ICMP — không tạo TCP connection vào port MC Protocol"
   next_steps:
-    - "1. GX Works Open Setting: thêm line 3 (TCP, MC Protocol, Port=6000) → Write to PLC"
-    - "2. Kết nối WinForms với PLC thật (Q06UDV cắm mạng) → test read/write"
-    - "3. Test ghi tag (Set_*) từ WinForms button → verify PLC nhận đúng"
-    - "4. Kiểm tra PlcSubscriptionManager polling + OnValueChanged event"
-    - "5. Kiểm tra SqliteHistorian ghi/đọc đúng (cần wire _historian vào Form1)"
-  blocked_by:     "GX Simulator KHÔNG hỗ trợ MC Protocol external — cần PLC thật Q06UDV cắm mạng để test HslCommunication"
+    - "1. Xóa TestRawAsync debug code khỏi Form1.cs và PlcClient.cs khi production"
+    - "2. Test Write tag từ WinForms button → verify PLC nhận đúng"
+    - "3. Kiểm tra reconnect tự động sau mất kết nối (EnsureConnected fix)"
+    - "4. Wire SqliteHistorian vào Form1 nếu cần lưu lịch sử"
   last_session:   "2026-06-07"
-  open_questions:
-    - "HslCommunication version nào đang dùng? Có cần update không?"
+  open_questions: []
   simulator_note: >
     GX Simulator (GX Works2 built-in) chỉ nhận MELSOFT connection, KHÔNG hỗ trợ MC Protocol
     từ HslCommunication. Phải dùng PLC thật Q06UDV hoặc MC Protocol Simulator bên thứ ba.
@@ -268,9 +266,10 @@ active_context:
 | DEC-001 | 2026-06-01 | Dùng HslCommunication cho MC Protocol           | `Core/PlcClient.cs`               |
 | DEC-002 | 2026-06-01 | lock(SyncLock) bao quanh mọi HslComm call       | `Core/PlcClient.cs`, `IO/*.cs`    |
 | DEC-003 | 2026-06-01 | PlcGroupWriter tự RMW — không để caller lo      | `IO/PlcGroupWriter.cs`            |
-| DEC-004 | 2026-06-01 | Watchdog dùng `Read("D0", 1)` — nhẹ, an toàn   | `Core/PlcClient.cs`               |
+| DEC-004 | 2026-06-07 | ~~Watchdog Read("D0")~~ → **ICMP ping** để check alive; KHÔNG tạo TCP vào port MC Protocol (Q series giới hạn ~8 connection slots) | `Core/PlcClient.cs` |
 | DEC-005 | 2026-06-07 | String Mitsubishi: LOW_BYTE=ký tự đầu, KHÔNG swap byte | `IO/PlcGroupReader.cs`, `IO/PlcGroupWriter.cs` |
 | DEC-006 | 2026-06-07 | String tag: Length=chars (10 word×2char=Length 20), tương tự Snap7 | `tags.json` |
+| DEC-007 | 2026-06-07 | Station=0 trong tags.json (NetworkStationNumber=0 cho Q series direct Ethernet); Station=255 gây timeout | `tags.json`, `Core/PlcClient.cs` |
 
 ### 4.3 Hướng dẫn Claude đọc context
 
@@ -286,6 +285,23 @@ Khi bắt đầu session mới, Claude PHẢI:
 
 > Format: `[YYYY-MM-DD] [TYPE] [File/Module] — Mô tả`  
 > Types: `FEAT` · `FIX` · `REFACTOR` · `PERF` · `TEST` · `DOCS` · `CHORE` · `BREAK`
+
+---
+
+### [2026-06-07] — Session 3 (Connection debug + reconnect fix + production test)
+
+```
+[FEAT]  McProtocolScada.Core/Core/PlcClient.cs          — Connect(): bỏ ConnectServer(), dùng short-connection Read("D0") test
+[FEAT]  McProtocolScada.Core/Core/PlcClient.cs          — Pingable(): đổi từ HslComm Read sang ICMP ping (tránh làm đầy connection table Q series)
+[FIX]   McProtocolScada.Core/Core/PlcClient.cs          — EnsureConnected(): fix trạng thái "Error" sau reconnect (gọi Connect() khi Pingable()=true && State!=Connected)
+[FEAT]  McProtocolScada.Core/Core/PlcClient.cs          — Thêm TestRawAsync() static method để debug raw socket MC Protocol
+[CHORE] McProtocolScada.WinFormsTest/tags.json          — Cập nhật 19 tags mới: Part/D162, TimeRunStep1-15/D671-685, StepRun/D1953, PartName/D8020(String-16), RecipeSettingStep/D10520
+[CHORE] McProtocolScada.WinFormsTest/tags.json          — Port đổi 5001→8000; Station đổi 255→0 (Request station No. = 0x00 cho Q series direct Ethernet)
+[CHORE] McProtocolScada.WinFormsTest/Form1.cs           — Thêm TestRawAsync debug MessageBox (cần xóa khi production); Watchdog 2000→10000ms
+[DOCS]  CLAUDE.md                                        — Cập nhật active_context + Decision Log; root cause documented
+[CHORE] RESOLVE: Root cause timeout = Q series connection table ~8 slots lấp đầy bởi HslComm TCP watchdog fail; giải pháp = ICMP ping + watchdog 10s + PLC reset
+[VERIFY] Read thành công: Part=546, PartName="CW180-WS-1", StepRun event fired, tất cả 19 tag OK
+```
 
 ---
 
@@ -400,7 +416,7 @@ Khi đọc file này, Claude phải:
 1. LUÔN đọc active_context trước khi code
 2. TUÂN THỦ naming convention C# (PascalCase methods, _camelCase fields)
 3. CẬP NHẬT active_context sau mỗi session
-4. THÊM entry CHANGELOG mỗi khi sửa/thêm code đáng kể
+4. THÊM entry CHANGELOG mỗi khi sửa/thêm code đáng kể 
 5. KHÔNG đề xuất lại kiến trúc đã có trong Decision Log
 6. lock(SyncLock) mọi lúc gọi HslCommunication
 7. KHÔNG dùng .Result / .Wait() — luôn async/await

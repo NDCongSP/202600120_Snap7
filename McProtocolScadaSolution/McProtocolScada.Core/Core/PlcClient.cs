@@ -122,22 +122,25 @@ namespace McProtocolClientLib.Core
         }
 
         /// <summary>
-        /// Kết nối PLC (sync). HslCommunication dùng "long-connection" qua ConnectServer().
+        /// Kết nối PLC (sync). Dùng short-connection (1 TCP/request) thay ConnectServer()
+        /// vì Q series không respond đúng khi giữ persistent socket.
         /// </summary>
         public bool Connect()
         {
             try
             {
                 SetState(PlcConnectionState.Connecting);
-
-                // Cập nhật IP đã resolve (nếu host là tên miền)
                 ApplyIp(ResolveHost(_host));
 
-                // Bật long-connection
-                var ok = (dynamic)_client;
-                var res = ok.ConnectServer();
+                // Verify bằng 1 short-connection read thực tế (không dùng ConnectServer)
+                bool success;
+                lock (SyncLock)
+                {
+                    var ok = (dynamic)_client;
+                    var res = ok.Read("D0", (ushort)1);
+                    success = res.IsSuccess;
+                }
 
-                bool success = res.IsSuccess;
                 SetState(success ? PlcConnectionState.Connected : PlcConnectionState.Error);
                 return success;
             }
@@ -163,12 +166,17 @@ namespace McProtocolClientLib.Core
         }
 
         /// <summary>
-        /// Tự reconnect khi mất kết nối.
+        /// Tự reconnect khi mất kết nối hoặc sau khi PLC khởi động lại.
         /// </summary>
         public bool EnsureConnected()
         {
             if (Pingable())
-                return true;
+            {
+                if (State == PlcConnectionState.Connected)
+                    return true;
+                // Host sống nhưng state chưa Connected (Error/Disconnected) → reconnect
+                return Connect();
+            }
 
             SetState(PlcConnectionState.Reconnecting);
             return Connect();
@@ -228,15 +236,16 @@ namespace McProtocolClientLib.Core
         }
 
         /// <summary>
-        /// Kiểm tra "sống" bằng cách đọc 1 word đơn giản (D0). Nhẹ và đủ chính xác.
+        /// Kiểm tra host còn sống bằng ICMP ping — KHÔNG tạo TCP connection vào port MC Protocol,
+        /// tránh làm đầy connection table của PLC (Q series giới hạn ~8 kết nối đồng thời).
         /// </summary>
         public bool Pingable()
         {
             try
             {
-                var ok = (dynamic)_client;
-                var res = ok.Read("D0", (ushort)1);
-                return res.IsSuccess;
+                using var ping = new System.Net.NetworkInformation.Ping();
+                var reply = ping.Send(_host, 1000);
+                return reply.Status == System.Net.NetworkInformation.IPStatus.Success;
             }
             catch
             {
@@ -278,6 +287,47 @@ namespace McProtocolClientLib.Core
             StopWatchdog();
             Disconnect();
             (_client as IDisposable)?.Dispose();
+        }
+
+        /// <summary>
+        /// Test raw socket MC Protocol (bypass HslCommunication) — dùng để debug.
+        /// Gửi đúng frame đã chứng minh hoạt động bằng PowerShell.
+        /// </summary>
+        public static async Task<string> TestRawAsync(string host, int port)
+        {
+            try
+            {
+                using var tcp = new System.Net.Sockets.TcpClient();
+                var connectTask = tcp.ConnectAsync(host, port);
+                if (await Task.WhenAny(connectTask, Task.Delay(3000)) != connectTask)
+                    return "Raw FAIL: Connect timeout (3s)";
+                await connectTask; // re-throw nếu có exception
+                var stream = tcp.GetStream();
+                stream.ReadTimeout = 5000;
+
+                // 3E Binary: Read D162 (0xA2), 1 word — same frame as working PowerShell test
+                byte[] req = {
+                    0x50,0x00,0x00,0xFF,0xFF,0x03,0x00,
+                    0x0C,0x00,0x10,0x00,0x01,0x04,0x00,0x00,
+                    0xA2,0x00,0x00,0xA8,0x01,0x00
+                };
+                await stream.WriteAsync(req, 0, req.Length);
+
+                var buf = new byte[64];
+                int n = await stream.ReadAsync(buf, 0, 64);
+                var hex = string.Join(" ", buf.Take(n).Select(b => $"{b:X2}"));
+
+                if (n >= 13 && buf[0] == 0xD0 && buf[9] == 0x00 && buf[10] == 0x00)
+                {
+                    ushort val = (ushort)(buf[11] | (buf[12] << 8));
+                    return $"Raw OK: D162={val}\n{hex}";
+                }
+                return $"Raw {n} bytes (unexpected):\n{hex}";
+            }
+            catch (Exception ex)
+            {
+                return $"Raw FAIL: {ex.Message}";
+            }
         }
     }
 }
