@@ -1,0 +1,30 @@
+[
+  {
+    "Name": "PLC_1",
+    "Host": "192.168.11.1",
+    "Port": 5006,
+    "FrameType": "QnA3E_Binary",
+    "Network": 0,
+    "Station": 255,
+    "Tags": [
+      {
+        "Name": "Step_Run",
+        "Address": "D1953",
+        "DataType": "Word",
+        "Length": 1
+      },
+      {
+        "Name": "PartCode",
+        "Address": "D1953",
+        "DataType": "Word",
+        "Length": 1
+      },
+      {
+        "Name": "PartName",
+        "Address": "D8020",
+        "DataType": "String",
+        "Length": 8
+      }
+    ]
+  }
+]

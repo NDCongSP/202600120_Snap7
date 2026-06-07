@@ -1,0 +1,118 @@
+[
+  {
+    "Name": "PLC_1",
+    "Host": "192.168.1.10",
+    "Port": 6000,
+    "FrameType": "QnA3E_Binary",
+    "Network": 0,
+    "Station": 255,
+    "Tags": [
+      {
+        "Name": "BoxIdScale",
+        "Address": "D100",
+        "DataType": "String",
+        "Length": 32
+      },
+      {
+        "Name": "BoxIdMetal",
+        "Address": "D200",
+        "DataType": "String",
+        "Length": 32
+      },
+      {
+        "Name": "PrintContentLine1",
+        "Address": "D300",
+        "DataType": "String",
+        "Length": 32
+      },
+      {
+        "Name": "PrintContentLine2",
+        "Address": "D400",
+        "DataType": "String",
+        "Length": 32
+      },
+      {
+        "Name": "PrintContentLine3",
+        "Address": "D500",
+        "DataType": "String",
+        "Length": 32
+      },
+      {
+        "Name": "NewCodeMetal",
+        "Address": "D10",
+        "DataType": "Word"
+      },
+      {
+        "Name": "IsCheck",
+        "Address": "M100",
+        "DataType": "Bool"
+      },
+      {
+        "Name": "ResultCheckMetal",
+        "Address": "D11",
+        "DataType": "Word"
+      },
+      {
+        "Name": "NewCodeScale",
+        "Address": "D12",
+        "DataType": "Word"
+      },
+      {
+        "Name": "StableTrigger",
+        "Address": "M101",
+        "DataType": "Bool"
+      },
+      {
+        "Name": "WeightCheckDone",
+        "Address": "M102",
+        "DataType": "Bool"
+      },
+      {
+        "Name": "ScaleValue",
+        "Address": "D20",
+        "DataType": "Real",
+        "Deadband": 0.01,
+        "OffsetValue": 0,
+        "GainRate": 1,
+        "NumDecimal": 2
+      },
+      {
+        "Name": "StableScaleValue",
+        "Address": "D22",
+        "DataType": "Real",
+        "Deadband": 0.01,
+        "OffsetValue": 0,
+        "GainRate": 1,
+        "NumDecimal": 1
+      },
+      {
+        "Name": "StandardGrossWeight",
+        "Address": "D24",
+        "DataType": "Real",
+        "Deadband": 0.01,
+        "OffsetValue": 0,
+        "GainRate": 1
+      },
+      {
+        "Name": "Counter",
+        "Address": "D30",
+        "DataType": "DInt"
+      },
+      {
+        "Name": "Output1",
+        "Address": "Y10",
+        "DataType": "Bool"
+      },
+      {
+        "Name": "Input1",
+        "Address": "X1A",
+        "DataType": "Bool"
+      },
+      {
+        "Name": "AlarmBit",
+        "Address": "D40.5",
+        "DataType": "Bool"
+      }
+    ]
+  }
+]
