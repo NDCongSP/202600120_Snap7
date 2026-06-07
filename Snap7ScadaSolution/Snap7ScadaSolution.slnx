@@ -1,4 +1,10 @@
 <Solution>
-  <Project Path="Snap7Scada.Core/Snap7Scada.Lib.csproj" />
-  <Project Path="Snap7Scada.WinFormsTest/Snap7Scada.WinFormsTest.csproj" />
+  <Folder Name="/MC_Protocol_Mitshubishi/">
+    <Project Path="../McProtocolScadaSolution/McProtocolScada.Core/McProtocolScada.Lib.csproj" />
+    <Project Path="../McProtocolScadaSolution/McProtocolScada.WinFormsTest/McProtocolScada.WinFormsTest.csproj" />
+  </Folder>
+  <Folder Name="/Profinet_S7/">
+    <Project Path="Snap7Scada.Core/Snap7Scada.Lib.csproj" />
+    <Project Path="Snap7Scada.WinFormsTest/Snap7Scada.WinFormsTest.csproj" />
+  </Folder>
 </Solution>

@@ -59,9 +59,9 @@ namespace McProtocolScada.WinFormsTest
                 _sub.OnValueChanged += Sub_OnValueChanged;
 
                 // 2) Đăng ký event cho từng tag cụ thể (nếu có)
-                AttachTagDebug("ScaleValue");
-                AttachTagDebug("IsCheck");
-                AttachTagDebug("NewCodeMetal");
+                AttachTagDebug("Step_Run");
+                AttachTagDebug("PartCode");
+                AttachTagDebug("PartName");
 
                 // 3) Kết nối PLC + Watchdog (KHÔNG block UI nếu fail)
                 bool connected = false;
