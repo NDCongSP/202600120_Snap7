@@ -219,7 +219,7 @@ public class PlcGroupWriter
         byte[] strBytes = new byte[byteCount];
         var ascii = Encoding.ASCII.GetBytes(text);
         Array.Copy(ascii, 0, strBytes, 0, Math.Min(ascii.Length, byteCount));
-
+        // Mitsubishi QnA3E binary: low_byte = char[2k] → write in-order, no swap needed.
         Array.Copy(strBytes, 0, buffer, index, byteCount);
     }
 

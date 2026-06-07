@@ -12,7 +12,6 @@ namespace McProtocolScada.WinFormsTest
         PlcRuntime _plcRuntime = null!;
         PlcClient _plc1Client = null!;
         PlcSubscriptionManager? _sub;
-        SqliteHistorian? _historian;
 
         private CancellationTokenSource? _readCts;
         private Task? _readTask;

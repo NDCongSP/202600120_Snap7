@@ -2,29 +2,56 @@
   {
     "Name": "PLC_1",
     "Host": "192.168.11.1",
-    "Port": 5006,
+    "Port": 6000,
     "FrameType": "QnA3E_Binary",
     "Network": 0,
     "Station": 255,
     "Tags": [
-      {
-        "Name": "Step_Run",
-        "Address": "D1953",
-        "DataType": "Word",
-        "Length": 1
-      },
-      {
-        "Name": "PartCode",
-        "Address": "D1953",
-        "DataType": "Word",
-        "Length": 1
-      },
-      {
-        "Name": "PartName",
-        "Address": "D8020",
-        "DataType": "String",
-        "Length": 8
-      }
+      { "Name": "PartName",                 "Address": "D4000", "DataType": "String", "Length": 20 },
+      { "Name": "Work",                    "Address": "D4010", "DataType": "String", "Length": 20 },
+
+      { "Name": "Set_Trigger_NewPartInfo", "Address": "D4020", "DataType": "Word",   "NumDecimal": 0 },
+      { "Name": "Log_Style",               "Address": "D4021", "DataType": "Word",   "NumDecimal": 0 },
+      { "Name": "Trigger_Log_Sanding",     "Address": "D4022", "DataType": "Word",   "NumDecimal": 0 },
+      { "Name": "Trigger_Log_OD",          "Address": "D4023", "DataType": "Word",   "NumDecimal": 0 },
+
+      { "Name": "Shaft_Num_Sanding",       "Address": "D4024", "DataType": "Word",   "NumDecimal": 0 },
+      { "Name": "Mortor_Sanding_Speed",    "Address": "D4025", "DataType": "Word",   "NumDecimal": 0 },
+      { "Name": "Spine_A",                 "Address": "D4026", "DataType": "DWord",  "GainRate": 0.001, "NumDecimal": 3 },
+      { "Name": "Spine_B",                 "Address": "D4028", "DataType": "DWord",  "GainRate": 0.001, "NumDecimal": 3 },
+      { "Name": "Spine_Target",            "Address": "D4030", "DataType": "DWord",  "GainRate": 0.001, "NumDecimal": 3 },
+      { "Name": "Spine_Low",               "Address": "D4032", "DataType": "DWord",  "GainRate": 0.001, "NumDecimal": 3 },
+      { "Name": "Spine_Hight",             "Address": "D4034", "DataType": "DWord",  "GainRate": 0.001, "NumDecimal": 3 },
+      { "Name": "OK_NG_Sanding",           "Address": "D4036", "DataType": "Word",   "NumDecimal": 0 },
+
+      { "Name": "Shaft_Num_OD",            "Address": "D4037", "DataType": "Word",   "NumDecimal": 0 },
+      { "Name": "Diam_Reading_1",          "Address": "D4038", "DataType": "Word",   "GainRate": 0.01, "NumDecimal": 2 },
+      { "Name": "Diam_Reading_2",          "Address": "D4039", "DataType": "Word",   "GainRate": 0.01, "NumDecimal": 2 },
+      { "Name": "Diam_Reading_3",          "Address": "D4040", "DataType": "Word",   "GainRate": 0.01, "NumDecimal": 2 },
+      { "Name": "OK_NG_OD_1",              "Address": "D4041", "DataType": "Word",   "NumDecimal": 0 },
+      { "Name": "OK_NG_OD_2",              "Address": "D4042", "DataType": "Word",   "NumDecimal": 0 },
+      { "Name": "OK_NG_OD_3",              "Address": "D4043", "DataType": "Word",   "NumDecimal": 0 },
+
+      { "Name": "Set_Shaft_Length",        "Address": "D4044", "DataType": "Word",   "NumDecimal": 0 },
+      { "Name": "Set_Freq_Target",         "Address": "D4045", "DataType": "Word",   "GainRate": 0.1,  "NumDecimal": 1 },
+      { "Name": "Set_Freq_Target_Low",     "Address": "D4046", "DataType": "Word",   "GainRate": 0.1,  "NumDecimal": 1 },
+      { "Name": "Set_Freq_Target_Hight",   "Address": "D4047", "DataType": "Word",   "GainRate": 0.1,  "NumDecimal": 1 },
+      { "Name": "Set_Formula_F",           "Address": "D4048", "DataType": "Word",   "NumDecimal": 0 },
+      { "Name": "Set_A",                   "Address": "D4049", "DataType": "DWord",  "GainRate": 0.001, "NumDecimal": 3 },
+      { "Name": "Set_B",                   "Address": "D4051", "DataType": "DWord",  "GainRate": 0.001, "NumDecimal": 3 },
+      { "Name": "Set_C",                   "Address": "D4053", "DataType": "DWord",  "GainRate": 0.001, "NumDecimal": 3 },
+      { "Name": "Set_D",                   "Address": "D4055", "DataType": "DWord",  "GainRate": 0.001, "NumDecimal": 3 },
+      { "Name": "Set_Diam_LL_1",           "Address": "D4057", "DataType": "Word",   "GainRate": 0.01, "NumDecimal": 2 },
+      { "Name": "Set_Diam_LL_2",           "Address": "D4058", "DataType": "Word",   "GainRate": 0.01, "NumDecimal": 2 },
+      { "Name": "Set_Diam_LL_3",           "Address": "D4059", "DataType": "Word",   "GainRate": 0.01, "NumDecimal": 2 },
+      { "Name": "Set_Diam_UL_1",           "Address": "D4060", "DataType": "Word",   "GainRate": 0.01, "NumDecimal": 2 },
+      { "Name": "Set_Diam_UL_2",           "Address": "D4061", "DataType": "Word",   "GainRate": 0.01, "NumDecimal": 2 },
+      { "Name": "Set_Diam_UL_3",           "Address": "D4062", "DataType": "Word",   "GainRate": 0.01, "NumDecimal": 2 },
+      { "Name": "Set_Tip_OD_Length_1",     "Address": "D4063", "DataType": "Word",   "NumDecimal": 0 },
+      { "Name": "Set_Tip_OD_Length_2",     "Address": "D4064", "DataType": "Word",   "NumDecimal": 0 },
+      { "Name": "Set_Tip_OD_Length_3",     "Address": "D4065", "DataType": "Word",   "NumDecimal": 0 },
+      { "Name": "Auto_Manual",             "Address": "D4066", "DataType": "Word",   "NumDecimal": 0 },
+      { "Name": "Set_OD_BOD",              "Address": "D4067", "DataType": "Word",   "NumDecimal": 0 }
     ]
   }
 ]

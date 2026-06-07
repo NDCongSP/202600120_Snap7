@@ -184,6 +184,8 @@ public class PlcGroupReader
                 {
                     int byteCount = t.WordSize * 2;
                     if (i + byteCount > b.Length) byteCount = b.Length - i;
+                    // Mitsubishi QnA3E binary: low_byte = char[2k], high_byte = char[2k+1] per word.
+                    // Bytes arrive in order [low, high] → ASCII decode in-order is correct, no swap needed.
                     string s = bt.TransString(b, i, byteCount, Encoding.ASCII);
                     int nullIdx = s.IndexOf('\0');
                     if (nullIdx >= 0) s = s.Substring(0, nullIdx);

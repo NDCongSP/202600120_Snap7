@@ -220,10 +220,16 @@ var wordCount = (StringLength + 1) / 2; // chia StringLength+1 cho 2
 ```yaml
 active_context:
   current_task: >
-    Làm cho McProtocolScadaSolution (Mitsubishi MC Protocol driver) chạy được hoàn chỉnh.
-    Driver đã có đầy đủ cấu trúc (port từ Snap7), cần verify + fix để build pass
-    và WinForms demo kết nối PLC thực tế chạy đúng.
-  branch:         "PLC_Mitsubíhi_MC_Protocol"
+    Build clean, tags.json hoàn chỉnh 42 tags (D4000–D4067).
+    Sẵn sàng test kết nối GX Simulator.
+  branch:         "PLC_Mitsubishi_MC_Protocol_Dev"
+  plc_hardware:
+    series:        "Mitsubishi MELSEC-Q"
+    model:         "Q06UDV (QCPU Q mode)"
+    ip:            "192.168.11.1"
+    port:          6000
+    frame:         "QnA3E_Binary (Binary Code)"
+    simulator:     "GX Works2/GX Simulator, IP 192.168.11.1"
   related_files:
     - "McProtocolScadaSolution/McProtocolScada.Core/Core/PlcClient.cs"
     - "McProtocolScadaSolution/McProtocolScada.Core/IO/PlcGroupReader.cs"
@@ -232,21 +238,27 @@ active_context:
     - "McProtocolScadaSolution/McProtocolScada.Core/Subscription/PlcSubscriptionManager.cs"
     - "McProtocolScadaSolution/McProtocolScada.WinFormsTest/Form1.cs"
     - "McProtocolScadaSolution/McProtocolScada.WinFormsTest/tags.json"
+  verified_ok:
+    - "Build: 0 error, 0 warning (2026-06-07)"
+    - "PlcAddressParser: D/M/X(HEX)/Y(HEX)/B(HEX)/ZR/D100.5 logic đúng"
+    - "PlcGroupReader: batch read, block split, bit-in-word decode đúng"
+    - "PlcGroupWriter: RMW cho bit-in-word đúng (little-endian HslComm)"
+    - "PlcClient: QnA3E_Binary port 6000 đúng cho Q06UDV"
+    - "String byte order: LOW_BYTE=ký tự đầu, KHÔNG swap — confirmed"
+    - "tags.json: 42 tags D4000–D4067 (PartName/Work=String×20, DWord×Gain, Word)"
   next_steps:
-    - "1. Build McProtocolScada.Core → fix compile errors nếu có"
-    - "2. Kiểm tra PlcAddressParser với X/Y/B (HEX) và D100.5 (bit-in-word)"
-    - "3. Kiểm tra PlcGroupReader batch read logic (grouping by device)"
-    - "4. Kiểm tra PlcGroupWriter Read-Modify-Write cho bit-in-word"
-    - "5. Chạy WinForms demo với PLC thực tế hoặc simulator"
-    - "6. Kiểm tra PlcSubscriptionManager polling + OnValueChanged"
-    - "7. Kiểm tra SqliteHistorian ghi/đọc đúng"
-  blocked_by:     "Cần PLC Mitsubishi thực tế hoặc GX Simulator để test live"
-  last_session:   "2026-06-03"
+    - "1. GX Works Open Setting: thêm line 3 (TCP, MC Protocol, Port=6000) → Write to PLC"
+    - "2. Kết nối WinForms với PLC thật (Q06UDV cắm mạng) → test read/write"
+    - "3. Test ghi tag (Set_*) từ WinForms button → verify PLC nhận đúng"
+    - "4. Kiểm tra PlcSubscriptionManager polling + OnValueChanged event"
+    - "5. Kiểm tra SqliteHistorian ghi/đọc đúng (cần wire _historian vào Form1)"
+  blocked_by:     "GX Simulator KHÔNG hỗ trợ MC Protocol external — cần PLC thật Q06UDV cắm mạng để test HslCommunication"
+  last_session:   "2026-06-07"
   open_questions:
-    - "PlcAddressParser có parse đúng X1A (HEX), B1F0, D100.5 chưa?"
     - "HslCommunication version nào đang dùng? Có cần update không?"
-    - "tags.json hiện cấu hình IP PLC nào? Có simulator sẵn không?"
-    - "String Mitsubishi: wordCount padding đã đúng chưa trong GroupReader?"
+  simulator_note: >
+    GX Simulator (GX Works2 built-in) chỉ nhận MELSOFT connection, KHÔNG hỗ trợ MC Protocol
+    từ HslCommunication. Phải dùng PLC thật Q06UDV hoặc MC Protocol Simulator bên thứ ba.
 ```
 
 ### 4.2 Decision Log
@@ -257,6 +269,8 @@ active_context:
 | DEC-002 | 2026-06-01 | lock(SyncLock) bao quanh mọi HslComm call       | `Core/PlcClient.cs`, `IO/*.cs`    |
 | DEC-003 | 2026-06-01 | PlcGroupWriter tự RMW — không để caller lo      | `IO/PlcGroupWriter.cs`            |
 | DEC-004 | 2026-06-01 | Watchdog dùng `Read("D0", 1)` — nhẹ, an toàn   | `Core/PlcClient.cs`               |
+| DEC-005 | 2026-06-07 | String Mitsubishi: LOW_BYTE=ký tự đầu, KHÔNG swap byte | `IO/PlcGroupReader.cs`, `IO/PlcGroupWriter.cs` |
+| DEC-006 | 2026-06-07 | String tag: Length=chars (10 word×2char=Length 20), tương tự Snap7 | `tags.json` |
 
 ### 4.3 Hướng dẫn Claude đọc context
 
@@ -272,6 +286,20 @@ Khi bắt đầu session mới, Claude PHẢI:
 
 > Format: `[YYYY-MM-DD] [TYPE] [File/Module] — Mô tả`  
 > Types: `FEAT` · `FIX` · `REFACTOR` · `PERF` · `TEST` · `DOCS` · `CHORE` · `BREAK`
+
+---
+
+### [2026-06-07] — Session 2 (Build verify + code review + tags.json + PLC confirm)
+
+```
+[FIX]   McProtocolScada.WinFormsTest/Form1.cs          — Xóa field _historian chưa dùng (CS0169 warning)
+[FIX]   McProtocolScada.Core/IO/PlcGroupReader.cs       — String decode: NO swap (LOW_BYTE=ký tự đầu, in-order đúng)
+[FIX]   McProtocolScada.Core/IO/PlcGroupWriter.cs       — String encode: NO swap, in-order đúng
+[CHORE] McProtocolScada.WinFormsTest/tags.json          — 42 tags D4000–D4067; PartName/Work gộp thành String×20
+[DOCS]  CLAUDE.md  — Xác nhận PLC: Q06UDV, QnA3E_Binary, port 6000, IP 192.168.11.1
+[DOCS]  CLAUDE.md  — Ghi chú: GX Simulator không hỗ trợ MC Protocol external; cần PLC thật
+[DOCS]  CLAUDE.md  — Hướng dẫn Open Setting: line 3 = TCP + MC Protocol + port 6000
+```
 
 ---
 
