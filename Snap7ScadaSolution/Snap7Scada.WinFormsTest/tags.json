@@ -15,7 +15,7 @@
         "Address": "DB1.DBB14",
         "DataType": "Word"
       },
-        {
+      {
         "Name": "S2",
         "Address": "DB1.DBB2",
         "DataType": "Word"
@@ -25,12 +25,17 @@
         "Address": "DB1.DBB10",
         "DataType": "Word"
       },
-        {
+      {
         "Name": "S_MD_OUT",
         "Address": "DB1.DBB4",
         "DataType": "Word"
       },
-       {
+      {
+        "Name": "S3",
+        "Address": "DB1.DBB32",
+        "DataType": "Word"
+      },
+      {
         "Name": "S5",
         "Address": "DB1.DBB6",
         "DataType": "Word"
@@ -39,10 +44,10 @@
         "Name": "Scale_Value",
         "Address": "DB1.DBB24",
         "DataType": "Real",
-        "Deadband": 0.01,
+        "Deadband": 0.00,
         "OffsetValue": 0,
         "GainRate": 1,
-        "NumDecimal": 1
+        "NumDecimal": 3
       },
       {
         "Name": "Scale_Stable_Trigger",
@@ -57,17 +62,21 @@
         "OffsetValue": 0,
         "GainRate": 1
       },
-    {
+      {
         "Name": "Check_Weight_Result",
         "Address": "DB1.DBB20",
         "DataType": "Word"
       },
-       {
+      {
         "Name": "S6",
+        "Address": "DB1.DBB8",
+        "DataType": "Word"
+      },
+      {
+        "Name": "Delay_Time_To_Print",
         "Address": "DB1.DBB22",
         "DataType": "Word"
       }
-
     ]
   }
 ]
