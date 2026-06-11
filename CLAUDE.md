@@ -220,8 +220,8 @@ var wordCount = (StringLength + 1) / 2; // chia StringLength+1 cho 2
 ```yaml
 active_context:
   current_task: >
-    Driver hoạt động OK với PLC thật Q06UDV: đọc 19 tags, subscription event, PartName String.
-    Tiếp theo: xóa debug code, test Write, wire SqliteHistorian.
+    Multi-PLC driver: đọc 3 PLC song song (PLC_1/2/3). Auto-reconnect watchdog fixed.
+    PLC_1 kết nối OK (192.168.11.3:8000). PLC_2/PLC_3 cần cập nhật IP trong tags.json.
   branch:         "PLC_Mitsubishi_MC_Protocol_Dev"
   plc_hardware:
     series:        "Mitsubishi MELSEC-Q"
@@ -248,10 +248,11 @@ active_context:
     - "String byte order: LOW_BYTE=ký tự đầu, KHÔNG swap — confirmed"
     - "Pingable dùng ICMP — không tạo TCP connection vào port MC Protocol"
   next_steps:
-    - "1. Test Write tag từ WinForms button → verify PLC nhận đúng (chọn tag, nhập giá trị, bấm Write)"
-    - "2. Kiểm tra reconnect tự động sau mất kết nối (rút cáp → cắm lại → lblStatus phải về Connected)"
-    - "3. (Optional) Verify plc_history.db được tạo và ghi dữ liệu đúng sau khi chạy"
-  last_session:   "2026-06-07"
+    - "1. Cập nhật IP thực của PLC_2 và PLC_3 trong tags.json (hiện dùng placeholder 192.168.11.4/5)"
+    - "2. Test reconnect: khi PLC mất kết nối → watchdog phát hiện State=Error → tự reconnect"
+    - "3. Test Write từ ComboBox dạng 'PLC_1:Part' → verify PLC nhận đúng"
+    - "4. Verify plc_history.db ghi dữ liệu cho cả 3 PLC"
+  last_session:   "2026-06-11"
   open_questions: []
   simulator_note: >
     GX Simulator (GX Works2 built-in) chỉ nhận MELSOFT connection, KHÔNG hỗ trợ MC Protocol
@@ -284,6 +285,22 @@ Khi bắt đầu session mới, Claude PHẢI:
 
 > Format: `[YYYY-MM-DD] [TYPE] [File/Module] — Mô tả`  
 > Types: `FEAT` · `FIX` · `REFACTOR` · `PERF` · `TEST` · `DOCS` · `CHORE` · `BREAK`
+
+---
+
+### [2026-06-11] — Session 5 (Auto-reconnect fix + Multi-PLC support)
+
+```
+[FIX]   McProtocolScada.Core/Core/PlcClient.cs          — Watchdog: thêm check State==Error để reconnect ngay cả khi ICMP alive (fix mất kết nối không tự khôi phục)
+[FEAT]  McProtocolScada.Core/Core/PlcClient.cs          — Thêm NotifyError(): Reader/Writer gọi khi lỗi để watchdog kích hoạt reconnect
+[FIX]   McProtocolScada.Core/IO/PlcGroupReader.cs       — ReadGroup catch: gọi _plc.NotifyError() khi đọc thất bại
+[FEAT]  McProtocolScada.Core/Core/PlcManager.cs         — Thêm GetAllPlcNames() để enumerate tất cả PLC trong config
+[FEAT]  McProtocolScada.WinFormsTest/tags.json          — Thêm PLC_2 (192.168.11.4:8000) và PLC_3 (192.168.11.5:8000) với cùng bộ tag
+[REFACTOR] McProtocolScada.WinFormsTest/Form1.cs        — Refactor multi-PLC: Dictionary<plcName,(Runtime,Sub)>, connect song song Task.WhenAll
+[FEAT]  McProtocolScada.WinFormsTest/Form1.cs           — listBox hiển thị "[PLC_1:Part]...", ComboBox Write dạng "PLC_1:Part"
+[FEAT]  McProtocolScada.WinFormsTest/Form1.cs           — lblStatus hiển thị trạng thái cả 3 PLC: "PLC_1:Connected | PLC_2:Error | ..."
+[BUILD] Build 0 error 0 warning — 2026-06-11
+```
 
 ---
 

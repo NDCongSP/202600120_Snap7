@@ -54,7 +54,7 @@ namespace McProtocolScada.WinFormsTest
             listBox1.ItemHeight = 15;
             listBox1.Location = new Point(12, 181);
             listBox1.Name = "listBox1";
-            listBox1.Size = new Size(754, 499);
+            listBox1.Size = new Size(823, 604);
             listBox1.TabIndex = 1;
             // 
             // label1
@@ -143,7 +143,7 @@ namespace McProtocolScada.WinFormsTest
             AcceptButton = button1;
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(800, 701);
+            ClientSize = new Size(847, 798);
             Controls.Add(label6);
             Controls.Add(label5);
             Controls.Add(label4);

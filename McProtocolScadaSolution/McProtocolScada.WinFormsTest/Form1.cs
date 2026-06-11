@@ -2,6 +2,7 @@ using McProtocolClientLib.Core;
 using McProtocolClientLib.Historian;
 using McProtocolClientLib.Subscription;
 using McProtocolClientLib.Tags;
+using System.Collections.Concurrent;
 using System.Diagnostics;
 
 namespace McProtocolScada.WinFormsTest
@@ -9,9 +10,10 @@ namespace McProtocolScada.WinFormsTest
     public partial class Form1 : Form
     {
         PlcManager _manager = new PlcManager();
-        PlcRuntime _plcRuntime = null!;
-        PlcClient _plc1Client = null!;
-        PlcSubscriptionManager? _sub;
+
+        // plcName → (runtime, subscription)
+        private readonly Dictionary<string, (PlcRuntime Runtime, PlcSubscriptionManager Sub)> _sessions = new();
+        private readonly ConcurrentDictionary<string, string> _plcStates = new();
 
         private CancellationTokenSource? _readCts;
         private Task? _readTask;
@@ -32,8 +34,11 @@ namespace McProtocolScada.WinFormsTest
             try
             {
                 _readCts?.Cancel();
-                _sub?.Stop();
-                _plc1Client?.Dispose();
+                foreach (var (_, session) in _sessions)
+                {
+                    session.Sub.Stop();
+                    session.Runtime.Client.Dispose();
+                }
             }
             catch { /* ignore on close */ }
         }
@@ -43,88 +48,87 @@ namespace McProtocolScada.WinFormsTest
             try
             {
                 _manager.LoadFromConfig("tags.json");
-
-                _plcRuntime = _manager.GetPlc("PLC_1");
-                _plc1Client = _plcRuntime.Client;
-
-                // ĐĂNG KÝ SỰ KIỆN TRƯỚC KHI KẾT NỐI
-                _plc1Client.StateChanged += Client_StateChanged;
-
-                // Bind error handler của Reader → chỉ thông báo, KHÔNG crash form
-                _plcRuntime.Reader.OnReadError += Reader_OnError;
-                _plcRuntime.Writer.OnWriteError += Writer_OnError;
-
-                // 1) Tạo handler subscription trước
-                _sub = new PlcSubscriptionManager(_plcRuntime.Reader);
-                _sub.OnValueChanged += Sub_OnValueChanged;
                 _historian = new SqliteHistorian("plc_history.db");
 
-                // 2) Đăng ký event cho từng tag cụ thể (nếu có)
-                AttachTagDebug("StepRun");
-                AttachTagDebug("Part");
-                AttachTagDebug("PartName");
-
-                // 3) Kết nối PLC + Watchdog (KHÔNG block UI nếu fail)
-                bool connected = false;
-                try
+                // Khởi tạo session cho mỗi PLC
+                foreach (var plcName in _manager.GetAllPlcNames())
                 {
-                    connected = await _plc1Client.ConnectAsync();
-                }
-                catch (Exception ex)
-                {
-                    ShowErrorOnce($"Connect PLC failed: {ex.Message}");
-                }
-                _plc1Client.StartWatchdog(10000);
+                    var runtime = _manager.GetPlc(plcName);
+                    _plcStates[plcName] = PlcConnectionState.Disconnected.ToString();
 
-                // 4) Đọc lần đầu (đã có try/catch trong Reader → không crash)
-                if (connected)
-                {
-                    await _plcRuntime.Reader.ReadGroupAsync(_plcRuntime.Tags);
-                    foreach (var tag in _plcRuntime.Tags)
-                        tag.RaiseValueChanged();
+                    runtime.Client.StateChanged += state => Client_StateChanged(plcName, state);
+                    runtime.Reader.OnReadError  += msg   => Reader_OnError(plcName, msg);
+                    runtime.Writer.OnWriteError += msg   => Writer_OnError(msg);
 
-                    var stepRunTag = _plcRuntime.Tags.FirstOrDefault(x => x.Name == "StepRun");
-                    if (stepRunTag != null)
-                        stepRunTag.ValueChanged += (t) =>
-                        {
-                            if (InvokeRequired)
-                                label1.Invoke(() => label1.Text = $"[Event] StepRun changed: {t.LastValue} -> {t.NewValue}");
-                            else
-                                label1.Text = $"[Event] StepRun changed: {t.LastValue} -> {t.NewValue}";
-                        };
+                    AttachTagDebug(runtime, "StepRun");
+                    AttachTagDebug(runtime, "Part");
+                    AttachTagDebug(runtime, "PartName");
+
+                    var sub = new PlcSubscriptionManager(runtime.Reader);
+                    sub.OnValueChanged += tag => Sub_OnValueChanged(plcName, tag);
+                    _sessions[plcName] = (runtime, sub);
                 }
 
-                // 5) Bắt đầu polling subscription
-                _sub.Subscribe(_plcRuntime.Tags, intervalMs: 200);
+                // Kết nối tất cả PLC song song
+                var connectTasks = _sessions.Select(async kv =>
+                {
+                    string name = kv.Key;
+                    var session = kv.Value;
 
-                // 6) Thread phụ cập nhật UI label
+                    bool connected = false;
+                    try { connected = await session.Runtime.Client.ConnectAsync(); }
+                    catch (Exception ex) { ShowErrorOnce($"[{name}] Connect: {ex.Message}"); }
+
+                    session.Runtime.Client.StartWatchdog(10000);
+
+                    if (connected)
+                    {
+                        await session.Runtime.Reader.ReadGroupAsync(session.Runtime.Tags);
+                        foreach (var tag in session.Runtime.Tags)
+                            tag.RaiseValueChanged();
+
+                        // StepRun → label1
+                        var stepRunTag = session.Runtime.Tags.FirstOrDefault(x => x.Name == "StepRun");
+                        if (stepRunTag != null)
+                            stepRunTag.ValueChanged += (t) =>
+                            {
+                                if (InvokeRequired)
+                                    label1.Invoke(() => label1.Text = $"[{name}] StepRun: {t.LastValue} -> {t.NewValue}");
+                                else
+                                    label1.Text = $"[{name}] StepRun: {t.LastValue} -> {t.NewValue}";
+                            };
+                    }
+
+                    session.Sub.Subscribe(session.Runtime.Tags, intervalMs: 200);
+                }).ToList();
+
+                await Task.WhenAll(connectTasks);
+
+                // Fill ComboBox: "PLC_1:Part", "PLC_2:Part", ...
+                var tagItems = _sessions
+                    .SelectMany(kv => kv.Value.Runtime.Tags.Select(t => $"{kv.Key}:{t.Name}"))
+                    .ToArray();
+                _cbTagName.Items.AddRange(tagItems);
+
+                // Thread phụ cập nhật UI listBox định kỳ
                 _readCts = new CancellationTokenSource();
                 _readTask = Task.Run(() => TaskReadPlcAsync(_readCts.Token));
-
-                _cbTagName.Items.AddRange(_plcRuntime.Tags.Select(x => x.Name).ToArray());
             }
             catch (Exception ex)
             {
-                // Bất cứ lỗi nào trong Form_Load đều hiện thông báo, KHÔNG đóng form
-                MessageBox.Show(this,
-                    $"Init error:\n{ex.Message}",
-                    "PLC Init",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Warning);
+                MessageBox.Show(this, $"Init error:\n{ex.Message}", "PLC Init",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }
 
-        /// <summary>
-        /// Gắn debug-log cho 1 tag theo tên (an toàn nếu tag không tồn tại).
-        /// </summary>
-        private void AttachTagDebug(string tagName)
+        /// <summary>Gắn debug-log cho 1 tag theo tên (an toàn nếu tag không tồn tại).</summary>
+        private void AttachTagDebug(PlcRuntime runtime, string tagName)
         {
-            var tag = _plcRuntime.Tags.FirstOrDefault(t => t.Name == tagName);
+            var tag = runtime.Tags.FirstOrDefault(t => t.Name == tagName);
             if (tag == null) return;
-
             tag.ValueChanged += (t) =>
             {
-                Debug.WriteLine($"{DateTime.Now:O} [{t.Name}] {t.LastValue} -> {t.NewValue} ({t.DataType}) -> Deadband:{t.Deadband}");
+                Debug.WriteLine($"{DateTime.Now:O} [{t.Name}] {t.LastValue} -> {t.NewValue} ({t.DataType})");
             };
         }
 
@@ -134,70 +138,42 @@ namespace McProtocolScada.WinFormsTest
             {
                 try
                 {
-                    //Action update = () =>
-                    //{
-                    //    var boxIdScale = _plcRuntime.Tags.FirstOrDefault(t => t.Name == "BoxIdScale");
-                    //    var boxIdMetal = _plcRuntime.Tags.FirstOrDefault(t => t.Name == "BoxIdMetal");
-                    //    var scaleValue = _plcRuntime.Tags.FirstOrDefault(t => t.Name == "ScaleValue");
-
-                    //    label1.Text = $"BoxIdScale: {boxIdScale?.NewValue}";
-                    //    label2.Text = $"BoxIdMetal: {boxIdMetal?.NewValue}";
-                    //    label3.Text = $"ScaleValue: {scaleValue?.NewValue}";
-                    //};
-
-                    foreach (var item in _plcRuntime.Tags)
-                    {
-                        if (InvokeRequired)
+                    foreach (var (plcName, session) in _sessions)
+                        foreach (var item in session.Runtime.Tags)
                         {
-                            BeginInvoke((Action)(() =>
-                            {
-                                UpdateListBoxItem(item);
-                            }));
+                            if (InvokeRequired)
+                                BeginInvoke((Action)(() => UpdateListBoxItem(plcName, item)));
+                            else
+                                UpdateListBoxItem(plcName, item);
                         }
-                        else
-                        {
-                            UpdateListBoxItem(item);
-                        }
-                    }
-
-                    if (IsHandleCreated)
-                    {
-                        //if (InvokeRequired) BeginInvoke(update);
-                        //else update();
-                    }
 
                     await Task.Delay(1000, token);
                 }
-                catch (OperationCanceledException)
-                {
-                    break;
-                }
-                catch
-                {
-                    try { await Task.Delay(500, token); } catch { break; }
-                }
+                catch (OperationCanceledException) { break; }
+                catch { try { await Task.Delay(500, token); } catch { break; } }
             }
         }
 
-        private void Sub_OnValueChanged(PlcTag tag)
+        private void Sub_OnValueChanged(string plcName, PlcTag tag)
         {
             _ = Task.Run(() => _historian?.Log(tag));
 
             if (!IsHandleCreated) return;
             if (InvokeRequired)
-                BeginInvoke(new Action(() => UpdateListBoxItem(tag)));
+                BeginInvoke(new Action(() => UpdateListBoxItem(plcName, tag)));
             else
-                UpdateListBoxItem(tag);
+                UpdateListBoxItem(plcName, tag);
         }
 
-        private void UpdateListBoxItem(PlcTag tag)
+        private void UpdateListBoxItem(string plcName, PlcTag tag)
         {
-            string itemText = $"{DateTime.Now:O} [{tag.Name}] {tag.LastValue} -> {tag.NewValue} ({tag.DataType})";
+            string key = $"{plcName}:{tag.Name}";
+            string itemText = $"{DateTime.Now:HH:mm:ss} [{key}] {tag.LastValue} -> {tag.NewValue} ({tag.DataType})";
 
             int foundIndex = -1;
             for (int i = 0; i < listBox1.Items.Count; i++)
             {
-                if (listBox1.Items[i]!.ToString()!.Contains(tag.Name))
+                if (listBox1.Items[i]!.ToString()!.Contains($"[{key}]"))
                 {
                     foundIndex = i;
                     break;
@@ -215,26 +191,22 @@ namespace McProtocolScada.WinFormsTest
             }
         }
 
-        private void Client_StateChanged(PlcConnectionState obj)
+        private void Client_StateChanged(string plcName, PlcConnectionState state)
         {
+            _plcStates[plcName] = state.ToString();
             if (!IsHandleCreated) return;
+            var statusText = string.Join(" | ", _plcStates.Select(kv => $"{kv.Key}:{kv.Value}"));
             if (InvokeRequired)
-                BeginInvoke((Action)(() => lblStatus.Text = obj.ToString()));
+                BeginInvoke((Action)(() => lblStatus.Text = statusText));
             else
-                lblStatus.Text = obj.ToString();
+                lblStatus.Text = statusText;
         }
 
-        /// <summary>
-        /// Khi Reader báo lỗi (Timeout, kết nối...) → cập nhật status, log, KHÔNG đóng form.
-        /// </summary>
-        private void Reader_OnError(string message)
+        private void Reader_OnError(string plcName, string message)
         {
-            // Log debug
-            Debug.WriteLine($"[ReaderError] {DateTime.Now:O} {message}");
-
-            // Cập nhật status bar (không bật MessageBox để khỏi spam)
+            Debug.WriteLine($"[{plcName}][ReaderError] {DateTime.Now:O} {message}");
             if (!IsHandleCreated) return;
-            Action act = () => lblStatus.Text = $"Read error: {message}";
+            Action act = () => lblStatus.Text = $"[{plcName}] Read error: {message}";
             if (InvokeRequired) BeginInvoke(act); else act();
         }
 
@@ -244,27 +216,18 @@ namespace McProtocolScada.WinFormsTest
             ShowErrorOnce($"Write error: {message}");
         }
 
-        /// <summary>
-        /// Hiện 1 MessageBox nhưng giới hạn tần suất (không spam khi PLC offline liên tục).
-        /// </summary>
         private void ShowErrorOnce(string message)
         {
             if (!IsHandleCreated) return;
-
-            // Cùng nội dung & trong vòng 5 giây thì bỏ qua
             if (message == _lastErrorMessage &&
                 (DateTime.Now - _lastErrorShownAt).TotalSeconds < 5)
                 return;
-
             _lastErrorMessage = message;
             _lastErrorShownAt = DateTime.Now;
-
             Action show = () =>
             {
-                MessageBox.Show(this, message, "PLC",
-                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show(this, message, "PLC", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             };
-
             if (InvokeRequired) BeginInvoke(show);
             else show();
         }
@@ -275,27 +238,30 @@ namespace McProtocolScada.WinFormsTest
         {
             try
             {
-                var writer = _plcRuntime?.Writer;
-                if (writer == null) return;
+                var text = _cbTagName.Text;
+                if (string.IsNullOrEmpty(text)) return;
 
-                var tag = _plcRuntime!.Tags.FirstOrDefault(t => t.Name == _cbTagName.Text);
+                // Parse "PLC_1:Part" → plcName="PLC_1", tagName="Part"
+                var parts = text.Split(':', 2);
+                if (parts.Length != 2) return;
+                string plcName = parts[0];
+                string tagName = parts[1];
+
+                if (!_sessions.TryGetValue(plcName, out var session)) return;
+                var tag = session.Runtime.Tags.FirstOrDefault(t => t.Name == tagName);
                 if (tag == null) return;
 
-                // 1. Chuyển đổi dữ liệu an toàn theo kiểu tag
                 object newValue = tag.DataType switch
                 {
                     PlcDataType.String => _txtNewValue.Text,
-                    PlcDataType.Bool => _txtNewValue.Text.ToLower() == "true" || _txtNewValue.Text == "1",
+                    PlcDataType.Bool   => _txtNewValue.Text.ToLower() == "true" || _txtNewValue.Text == "1",
                     PlcDataType.Real or PlcDataType.LReal
                         => double.TryParse(_txtNewValue.Text, out var d) ? d : 0.0,
                     _ => int.TryParse(_txtNewValue.Text, out var i) ? i : 0
                 };
 
-                // 2. Chỉ ghi tag đang chọn (tối ưu)
                 tag.NewValue = newValue;
-                var tagsToWrite = new List<PlcTag> { tag };
-
-                await Task.Run(() => writer.WriteGroup(tagsToWrite));
+                await Task.Run(() => session.Runtime.Writer.WriteGroup(new List<PlcTag> { tag }));
             }
             catch (Exception ex)
             {
