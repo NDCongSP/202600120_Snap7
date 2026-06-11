@@ -67,10 +67,11 @@ public class PlcGroupReader
             }
             catch (Exception ex)
             {
-                // Đánh dấu các tag là disconnect và thông báo (không crash app)
                 foreach (var tag in tags)
                     tag.Status = PlcConnectionState.Disconnected;
 
+                // Báo PlcClient biết để watchdog kích hoạt reconnect
+                _plc.NotifyError();
                 OnReadError?.Invoke(ex.Message);
             }
         });

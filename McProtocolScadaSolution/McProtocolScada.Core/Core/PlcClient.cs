@@ -200,12 +200,13 @@ namespace McProtocolClientLib.Core
                 {
                     try
                     {
-                        if (!Pingable())
+                        // Reconnect khi: ICMP fail HOẶC state=Error (TCP drop nhưng host vẫn ping được)
+                        if (!Pingable() || State == PlcConnectionState.Error)
                         {
                             await _connectionLock.WaitAsync(token);
                             try
                             {
-                                if (!Pingable())
+                                if (State != PlcConnectionState.Connected)
                                 {
                                     SetState(PlcConnectionState.Reconnecting);
                                     await ConnectAsync();
@@ -233,6 +234,16 @@ namespace McProtocolClientLib.Core
             _watchdogCts?.Cancel();
             _watchdogCts?.Dispose();
             _watchdogCts = null;
+        }
+
+        /// <summary>
+        /// Gọi bởi Reader/Writer khi giao tiếp thất bại.
+        /// Đánh dấu state = Error để watchdog kích hoạt reconnect ngay tick tiếp theo.
+        /// </summary>
+        public void NotifyError()
+        {
+            if (State == PlcConnectionState.Connected)
+                SetState(PlcConnectionState.Error);
         }
 
         /// <summary>

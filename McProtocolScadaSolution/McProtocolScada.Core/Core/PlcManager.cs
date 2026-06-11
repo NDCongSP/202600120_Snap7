@@ -42,6 +42,8 @@ public class PlcManager
     }
 
     public PlcRuntime GetPlc(string name) => _plcs[name];
+
+    public IEnumerable<string> GetAllPlcNames() => _plcs.Keys;
 }
 
 public class PlcRuntime
