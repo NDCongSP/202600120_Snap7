@@ -220,40 +220,43 @@ var wordCount = (StringLength + 1) / 2; // chia StringLength+1 cho 2
 ```yaml
 active_context:
   current_task: >
-    Multi-PLC driver: đọc 3 PLC song song (PLC_1/2/3). Auto-reconnect watchdog fixed.
-    PLC_1 kết nối OK (192.168.11.3:8000). PLC_2/PLC_3 cần cập nhật IP trong tags.json.
+    Session 8: Thêm PlcLogger (text file) + watchdog wake-on-error (SemaphoreSlim) +
+    unit tests 61/61 PASS. Log file cho phép chẩn đoán nguyên nhân reconnect thất bại
+    khi chạy app thật với PLC.
   branch:         "PLC_Mitsubishi_MC_Protocol_Dev"
   plc_hardware:
     series:        "Mitsubishi MELSEC-Q"
     model:         "Q06UDV (QCPU Q mode)"
-    ip:            "192.168.11.3"
+    ip:            "192.168.11.1"
     port:          8000
     frame:         "QnA3E_Binary (Binary Code)"
     station:       0
-    note:          "Port 8000 = MC Protocol (Open Setting Line 2). Station=0 trong tags.json (NetworkStationNumber=0xFF gây timeout). Pingable dùng ICMP tránh làm đầy connection table Q series (~8 slots)."
+    note:          "Port 8000 = MC Protocol (Open Setting Line 2). Station=0 (=0xFF gây timeout). Pingable dùng ICMP tránh làm đầy connection table Q series (~8 slots)."
   related_files:
     - "McProtocolScadaSolution/McProtocolScada.Core/Core/PlcClient.cs"
     - "McProtocolScadaSolution/McProtocolScada.Core/IO/PlcGroupReader.cs"
-    - "McProtocolScadaSolution/McProtocolScada.Core/IO/PlcGroupWriter.cs"
+    - "McProtocolScadaSolution/McProtocolScada.Core/Diagnostics/PlcLogger.cs"
     - "McProtocolScadaSolution/McProtocolScada.Core/Tags/PlcAddressParser.cs"
-    - "McProtocolScadaSolution/McProtocolScada.Core/Subscription/PlcSubscriptionManager.cs"
     - "McProtocolScadaSolution/McProtocolScada.WinFormsTest/Form1.cs"
     - "McProtocolScadaSolution/McProtocolScada.WinFormsTest/tags.json"
+    - "McProtocolScadaSolution/McProtocolScada.Tests/"
   verified_ok:
-    - "Build: 0 error (2026-06-07)"
-    - "PlcClient kết nối OK: Q06UDV 192.168.11.3:8000, QnA3E_Binary, Station=0"
+    - "Build: 0 error 0 warning (2026-06-15)"
+    - "Unit tests: 61/61 PASS (PlcAddressParser 44, BlockSplitter 11, PlcClientState 16)"
+    - "NotifyError_WakesWatchdog_WithinShortTime: PASS — SemaphoreSlim wake-up < 1s"
+    - "PlcLogger: tạo logs/plc_YYYYMMDD.log trong AppBase (thư mục Debug output)"
+    - "PlcClient kết nối OK: Q06UDV 192.168.11.1:8000, QnA3E_Binary, Station=0"
     - "Read thành công: Part=546, PartName=CW180-WS-1(String), StepRun event OK"
-    - "Subscription polling 200ms hoạt động, OnValueChanged event đúng"
-    - "PlcAddressParser: D/M/X(HEX)/Y(HEX)/B(HEX)/ZR/D100.5 logic đúng"
-    - "String byte order: LOW_BYTE=ký tự đầu, KHÔNG swap — confirmed"
-    - "Pingable dùng ICMP — không tạo TCP connection vào port MC Protocol"
   next_steps:
-    - "1. Cập nhật IP thực của PLC_2 và PLC_3 trong tags.json (hiện dùng placeholder 192.168.11.4/5)"
-    - "2. Test reconnect: khi PLC mất kết nối → watchdog phát hiện State=Error → tự reconnect"
-    - "3. Test Write từ ComboBox dạng 'PLC_1:Part' → verify PLC nhận đúng"
-    - "4. Verify plc_history.db ghi dữ liệu cho cả 3 PLC"
-  last_session:   "2026-06-11"
-  open_questions: []
+    - "1. CHẠY APP + mô phỏng mất kết nối → đọc [AppBase]/logs/plc_*.log"
+    - "  → Tìm line 'Connect() FAILED: ...' để biết nguyên nhân chính xác từ HslCommunication"
+    - "  → Nếu 'System authorization failed': HslCom library-level limit → cần raw TCP hoặc license"
+    - "  → Nếu 'timeout': Q series connection table full → investigate TCP cleanup"
+    - "2. Test Write từ ComboBox dạng 'PLC_1:Part' → verify PLC nhận đúng"
+    - "3. Verify plc_history.db ghi dữ liệu cho cả 3 PLC"
+  last_session:   "2026-06-15"
+  open_questions:
+    - "HslCommunication authorization: library-level hay instance-level? Log sẽ xác nhận."
   simulator_note: >
     GX Simulator (GX Works2 built-in) chỉ nhận MELSOFT connection, KHÔNG hỗ trợ MC Protocol
     từ HslCommunication. Phải dùng PLC thật Q06UDV hoặc MC Protocol Simulator bên thứ ba.
@@ -270,6 +273,9 @@ active_context:
 | DEC-005 | 2026-06-07 | String Mitsubishi: LOW_BYTE=ký tự đầu, KHÔNG swap byte | `IO/PlcGroupReader.cs`, `IO/PlcGroupWriter.cs` |
 | DEC-006 | 2026-06-07 | String tag: Length=chars (10 word×2char=Length 20), tương tự Snap7 | `tags.json` |
 | DEC-007 | 2026-06-07 | Station=0 trong tags.json (NetworkStationNumber=0 cho Q series direct Ethernet); Station=255 gây timeout | `tags.json`, `Core/PlcClient.cs` |
+| DEC-008 | 2026-06-12 | Connect() luôn recreate HslComm instance (_client mutable) — HslCommunication "System authorization failed" chỉ tự recover khi tạo instance mới | `Core/PlcClient.cs` |
+| DEC-009 | 2026-06-12 | PlcGroupReader KHÔNG gọi EnsureConnected() — watchdog là sole reconnect, tránh concurrent Connect() flood | `Core/PlcClient.cs`, `IO/PlcGroupReader.cs` |
+| DEC-010 | 2026-06-15 | Watchdog dùng SemaphoreSlim.WaitAsync thay Task.Delay → NotifyError() wake watchdog ngay, không đợi interval | `Core/PlcClient.cs` |
 
 ### 4.3 Hướng dẫn Claude đọc context
 
@@ -285,6 +291,41 @@ Khi bắt đầu session mới, Claude PHẢI:
 
 > Format: `[YYYY-MM-DD] [TYPE] [File/Module] — Mô tả`  
 > Types: `FEAT` · `FIX` · `REFACTOR` · `PERF` · `TEST` · `DOCS` · `CHORE` · `BREAK`
+
+---
+
+### [2026-06-15] — Session 8 (PlcLogger + watchdog wake-on-error + unit tests)
+
+```
+[FEAT]  McProtocolScada.Core/Diagnostics/PlcLogger.cs       — NEW: static thread-safe file logger → [AppBase]/logs/plc_YYYYMMDD.log
+[FIX]   McProtocolScada.Core/Core/PlcClient.cs              — Watchdog: SemaphoreSlim _reconnectSignal thay Task.Delay → NotifyError() wake watchdog NGAY (không đợi 3s interval)
+[FIX]   McProtocolScada.Core/Core/PlcClient.cs              — Log Connect() attempt + kết quả + res.Message của HslCommunication (chẩn đoán nguyên nhân reconnect fail)
+[FIX]   McProtocolScada.Core/Core/PlcClient.cs              — Watchdog log state transition, consecutive failure count
+[FIX]   McProtocolScada.Core/IO/PlcGroupReader.cs           — Log ReadGroup FAIL với exact error message khi HslCommunication trả về lỗi
+[FIX]   McProtocolScada.WinFormsTest/Form1.cs               — StartWatchdog(10000) → StartWatchdog(3000): phát hiện mất kết nối nhanh hơn
+[FEAT]  McProtocolScada.Core/McProtocolScada.Lib.csproj     — Thêm InternalsVisibleTo("McProtocolScada.Tests")
+[TEST]  McProtocolScada.Tests/McProtocolScada.Tests.csproj  — NEW: xUnit test project (net8.0), thêm vào solution
+[TEST]  McProtocolScada.Tests/PlcAddressParserTests.cs      — 44 test cases: D/M/X(HEX)/Y(HEX)/B(HEX)/ZR/D100.5/String/error cases
+[TEST]  McProtocolScada.Tests/BlockSplitterTests.cs         — 11 test cases: gap/length split logic, boundary conditions, thực tế từ tags.json
+[TEST]  McProtocolScada.Tests/PlcClientStateTests.cs        — 16 test cases: NotifyError state machine, watchdog lifecycle, wake-on-error
+[DOCS]  CLAUDE.md                                           — Cập nhật active_context, DEC-010, CHANGELOG
+[BUILD] Build 0 error 0 warning — 2026-06-15
+[TEST]  61/61 tests PASS — 2026-06-15
+```
+
+---
+
+### [2026-06-12] — Session 7 (Triệt để fix reconnect — recreate HslComm instance)
+
+```
+[FIX]   McProtocolScada.Core/Core/PlcClient.cs          — _client non-readonly: Connect() luôn recreate MelsecMcNet/... instance mới để xóa "System authorization failed" error state trong HslCommunication
+[FIX]   McProtocolScada.Core/Core/PlcClient.cs          — _connectGuard SemaphoreSlim(1,1): ngăn concurrent Connect() calls (non-blocking Wait(0))
+[REFACTOR] McProtocolScada.Core/Core/PlcClient.cs       — Watchdog đơn giản hóa: if(State!=Connected) → ConnectAsync(); không cần check Pingable riêng vì Connect() sẽ fail nhanh nếu host down
+[FIX]   McProtocolScada.Core/Core/PlcClient.cs          — StartWatchdog default 10000→3000ms: phát hiện và recover mất kết nối nhanh hơn
+[FIX]   McProtocolScada.Core/IO/PlcGroupReader.cs       — Bỏ EnsureConnected(): thay bằng State check đơn giản. Watchdog là sole reconnect. Tránh N×200ms subscription polls cùng flood Connect()
+[DOCS]  CLAUDE.md                                        — Thêm DEC-008, DEC-009; cập nhật active_context, next_steps
+[BUILD] Build 0 error 0 warning — 2026-06-12
+```
 
 ---
 

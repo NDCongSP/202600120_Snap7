@@ -79,7 +79,7 @@ namespace McProtocolScada.WinFormsTest
                     try { connected = await session.Runtime.Client.ConnectAsync(); }
                     catch (Exception ex) { ShowErrorOnce($"[{name}] Connect: {ex.Message}"); }
 
-                    session.Runtime.Client.StartWatchdog(10000);
+                    session.Runtime.Client.StartWatchdog(3000);
 
                     if (connected)
                     {
