@@ -1,7 +1,9 @@
 <Solution>
   <Folder Name="/MC_Protocol_Mitshubishi/">
     <Project Path="../McProtocolScadaSolution/McProtocolScada.Core/McProtocolScada.Lib.csproj" />
-    <Project Path="../McProtocolScadaSolution/McProtocolScada.Tests/McProtocolScada.Tests.csproj" />
+    <Project Path="../McProtocolScadaSolution/McProtocolScada.Tests/McProtocolScada.Tests.csproj">
+      <Build Solution="Debug|*" Project="false" />
+    </Project>
     <Project Path="../McProtocolScadaSolution/McProtocolScada.WinFormsTest/McProtocolScada.WinFormsTest.csproj" />
   </Folder>
   <Folder Name="/Profinet_S7/">
