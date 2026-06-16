@@ -228,4 +228,32 @@ public class PlcClientStateTests
         // State phải là Error (không phải Connecting hay Disconnected)
         Assert.Equal(PlcConnectionState.Error, client.State);
     }
+
+    [Fact]
+    public void Connect_ToNonExistentHost_IsNotLicenseLimited()
+    {
+        // Lỗi timeout mạng KHÔNG phải lỗi license — phải phân biệt rõ 2 loại lỗi
+        using var client = new PlcClient(TestHost, TestPort);
+        client.Connect();
+        Assert.False(client.IsLicenseLimited);
+    }
+
+    // ===== LICENSE LIMIT DETECTION (DEC-011) =====
+    // HslCommunication free-tier trả về "System authorization failed..." khi hết quota —
+    // đây là lỗi process-level của library, KHÔNG phải lỗi PLC/mạng. Watchdog phải nhận
+    // diện đúng để backoff dài hơn thay vì retry vô nghĩa mỗi vài giây.
+
+    [Theory]
+    [InlineData("System authorization failed, need to use activation code authorization, thank you for your support. Active device number: 12687", true)]
+    [InlineData("system authorization failed", true)] // case-insensitive
+    [InlineData("SYSTEM AUTHORIZATION FAILED", true)]
+    [InlineData("OK", false)]
+    [InlineData("Connect timeout", false)]
+    [InlineData("Socket Exception", false)]
+    [InlineData("", false)]
+    [InlineData(null, false)]
+    public void IsAuthorizationError_DetectsLicenseMessageCorrectly(string? message, bool expected)
+    {
+        Assert.Equal(expected, PlcClient.IsAuthorizationError(message));
+    }
 }

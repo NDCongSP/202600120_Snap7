@@ -56,7 +56,8 @@ namespace McProtocolScada.WinFormsTest
                     var runtime = _manager.GetPlc(plcName);
                     _plcStates[plcName] = PlcConnectionState.Disconnected.ToString();
 
-                    runtime.Client.StateChanged += state => Client_StateChanged(plcName, state);
+                    var client = runtime.Client;
+                    client.StateChanged += state => Client_StateChanged(plcName, state, client.IsLicenseLimited);
                     runtime.Reader.OnReadError  += msg   => Reader_OnError(plcName, msg);
                     runtime.Writer.OnWriteError += msg   => Writer_OnError(msg);
 
@@ -191,9 +192,9 @@ namespace McProtocolScada.WinFormsTest
             }
         }
 
-        private void Client_StateChanged(string plcName, PlcConnectionState state)
+        private void Client_StateChanged(string plcName, PlcConnectionState state, bool licenseLimited)
         {
-            _plcStates[plcName] = state.ToString();
+            _plcStates[plcName] = licenseLimited ? $"{state}(LICENSE LIMIT)" : state.ToString();
             if (!IsHandleCreated) return;
             var statusText = string.Join(" | ", _plcStates.Select(kv => $"{kv.Key}:{kv.Value}"));
             if (InvokeRequired)

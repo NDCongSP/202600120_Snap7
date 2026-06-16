@@ -1,4 +1,3 @@
-using HslCommunication.Profinet.Melsec;
 using McProtocolClientLib.Diagnostics;
 using McProtocolClientLib.Tags;
 using System;
@@ -26,21 +25,36 @@ namespace McProtocolClientLib.Core
     }
 
     /// <summary>
-    /// Client kết nối PLC Mitsubishi qua MC Protocol (HslCommunication).
+    /// Client kết nối PLC Mitsubishi qua MC Protocol (raw TCP tự cài đặt, không phụ thuộc HslCommunication).
     /// Hỗ trợ sync/async + auto reconnect + watchdog.
     /// </summary>
     /// <remarks>
     /// File: McProtocolScada.Core/Core/PlcClient.cs
-    /// Created: 2026-06-01 | Modified: 2026-06-15
+    /// Created: 2026-06-01 | Modified: 2026-06-16
+    /// DEC-012: QnA3E_Binary dùng Mc3EBinaryClient (raw TCP tự cài đặt) thay MelsecMcNet —
+    /// loại bỏ hoàn toàn giới hạn license HslCommunication cho frame đang dùng thực tế.
+    /// DEC-013: Bỏ HOÀN TOÀN dependency HslCommunication khỏi project (PackageReference đã gỡ).
+    /// Các frame khác (ASCII/A1E/iQR) — không dùng với hardware hiện tại — throw NotSupportedException
+    /// vì chưa có bản raw-TCP thay thế (xem CreateClient()).
     /// </remarks>
     public class PlcClient : IDisposable
     {
         /// <summary>Khóa dùng chung cho Read/Write — tránh concurrent HslComm calls.</summary>
         public readonly object SyncLock = new object();
 
-        // Mutable — recreate mỗi lần Connect() để xóa HslComm internal error state
-        // (HslCommunication "System authorization failed" không tự recover trên instance cũ)
-        private object _client;
+        // KHÔNG recreate trong Connect() — đã proven sai (xem DEC-011): "System authorization failed"
+        // là lỗi giới hạn license của HslCommunication ở mức process (counter "Active device number"
+        // tăng dần liên tục qua log thực tế chạy PLC), không phải lỗi state của riêng 1 instance.
+        // Recreate instance mỗi lần reconnect chỉ làm counter đó cạn nhanh hơn, KHÔNG xóa được lỗi.
+        private readonly object _client;
+
+        // true khi lần Connect() gần nhất fail vì HslCommunication license limit
+        // ("System authorization failed") — phân biệt với lỗi mạng/PLC thật.
+        private volatile bool _licenseLimited;
+
+        // Khi đang license-limited, retry liên tục mỗi vài giây là vô nghĩa (không phải lỗi mạng
+        // để retry sửa được) và chỉ spam log — backoff dài hơn để giảm tải.
+        private const int LicenseLimitedBackoffMs = 60000;
 
         private readonly string _host;
         private readonly int _port;
@@ -66,6 +80,9 @@ namespace McProtocolClientLib.Core
         /// <summary>Port MC Protocol.</summary>
         public int Port => _port;
 
+        /// <summary>True nếu lần Connect() gần nhất fail vì HslCommunication license limit (không phải lỗi PLC/mạng).</summary>
+        public bool IsLicenseLimited => _licenseLimited;
+
         public PlcClient(string host, int port = 6000,
                          McFrameType frameType = McFrameType.QnA3E_Binary,
                          byte network = 0, byte station = 0xFF)
@@ -86,8 +103,9 @@ namespace McProtocolClientLib.Core
         // =========================================================================
 
         /// <summary>
-        /// Kết nối PLC (sync). Mỗi lần tạo lại instance HslCommunication mới
-        /// để xóa "System authorization failed" và bất kỳ TCP socket state tích lũy.
+        /// Kết nối PLC (sync). Dùng lại CÙNG 1 instance HslCommunication cho mọi lần retry
+        /// (xem DEC-011 — recreate instance không xóa được "System authorization failed" và
+        /// chỉ làm cạn nhanh license counter của HslCommunication).
         /// </summary>
         public bool Connect()
         {
@@ -101,17 +119,14 @@ namespace McProtocolClientLib.Core
             try
             {
                 SetState(PlcConnectionState.Connecting);
-                PlcLogger.Info($"[{_id}] Connect() → recreating HslComm instance + Read(D0) test...");
+                PlcLogger.Info($"[{_id}] Connect() → Read(D0) test...");
 
                 bool success;
                 string resultMsg;
 
                 lock (SyncLock)
                 {
-                    // CRITICAL: tạo lại HslComm instance để xóa "System authorization failed"
-                    // và TCP socket state từ connection cũ
                     try { ((dynamic)_client).ConnectClose(); } catch { }
-                    _client = CreateClient();
 
                     var res = ((dynamic)_client).Read("D0", (ushort)1);
                     success = res.IsSuccess;
@@ -121,10 +136,19 @@ namespace McProtocolClientLib.Core
                 if (success)
                 {
                     PlcLogger.Info($"[{_id}] Connect() SUCCESS");
+                    _licenseLimited = false;
                     SetState(PlcConnectionState.Connected);
+                }
+                else if (IsAuthorizationError(resultMsg))
+                {
+                    // Lỗi license HslCommunication, không phải lỗi PLC/mạng — retry nhanh vô nghĩa.
+                    _licenseLimited = true;
+                    PlcLogger.Error($"[{_id}] Connect() FAILED — HslCommunication LICENSE LIMIT (không phải lỗi PLC/mạng): {resultMsg}");
+                    SetState(PlcConnectionState.Error);
                 }
                 else
                 {
+                    _licenseLimited = false;
                     PlcLogger.Warn($"[{_id}] Connect() FAILED: {resultMsg}");
                     SetState(PlcConnectionState.Error);
                 }
@@ -132,6 +156,7 @@ namespace McProtocolClientLib.Core
             }
             catch (Exception ex)
             {
+                _licenseLimited = false;
                 PlcLogger.Error($"[{_id}] Connect() EXCEPTION: {ex.GetType().Name}: {ex.Message}");
                 SetState(PlcConnectionState.Error);
                 return false;
@@ -141,6 +166,14 @@ namespace McProtocolClientLib.Core
                 _connectGuard.Release();
             }
         }
+
+        /// <summary>
+        /// Nhận diện lỗi license HslCommunication ("System authorization failed...") để
+        /// phân biệt với lỗi mạng/PLC thật — pure function, test được không cần PLC.
+        /// </summary>
+        internal static bool IsAuthorizationError(string? message) =>
+            message != null &&
+            message.IndexOf("authorization failed", StringComparison.OrdinalIgnoreCase) >= 0;
 
         /// <summary>Kết nối PLC (async).</summary>
         public Task<bool> ConnectAsync() => Task.Run(() => Connect());
@@ -219,10 +252,14 @@ namespace McProtocolClientLib.Core
                         SetState(PlcConnectionState.Error);
                     }
 
-                    // Chờ: thức dậy sớm nếu NotifyError() báo hiệu, hoặc timeout sau intervalMs
+                    // license-limited: retry nhanh không sửa được gì (lỗi không phải mạng) → backoff dài
+                    // hơn để tránh spam log + tốn vô ích license counter của HslCommunication.
+                    int waitMs = _licenseLimited ? Math.Max(intervalMs, LicenseLimitedBackoffMs) : intervalMs;
+
+                    // Chờ: thức dậy sớm nếu NotifyError() báo hiệu, hoặc timeout sau waitMs
                     try
                     {
-                        await _reconnectSignal.WaitAsync(intervalMs, token);
+                        await _reconnectSignal.WaitAsync(waitMs, token);
                         // Trả về true = NotifyError() đã báo hiệu → lặp ngay
                         // Trả về false = timeout bình thường → lặp để check state
                     }
@@ -297,16 +334,17 @@ namespace McProtocolClientLib.Core
             string ip = ResolveHost(_host);
             switch (_frameType)
             {
-                case McFrameType.QnA3E_Ascii:
-                    return new MelsecMcAsciiNet { IpAddress = ip, Port = _port, NetworkNumber = _network, NetworkStationNumber = _station, ConnectTimeOut = 3000, ReceiveTimeOut = 3000 };
-                case McFrameType.A1E_Binary:
-                    return new MelsecA1ENet { IpAddress = ip, Port = _port, ConnectTimeOut = 3000, ReceiveTimeOut = 3000 };
-                case McFrameType.A1E_Ascii:
-                    return new MelsecA1EAsciiNet { IpAddress = ip, Port = _port, ConnectTimeOut = 3000, ReceiveTimeOut = 3000 };
-                case McFrameType.iQR_Binary:
-                    return new MelsecMcRNet { IpAddress = ip, Port = _port, NetworkNumber = _network, NetworkStationNumber = _station, ConnectTimeOut = 3000, ReceiveTimeOut = 3000 };
-                default: // QnA3E_Binary
-                    return new MelsecMcNet { IpAddress = ip, Port = _port, NetworkNumber = _network, NetworkStationNumber = _station, ConnectTimeOut = 3000, ReceiveTimeOut = 3000 };
+                case McFrameType.QnA3E_Binary:
+                    // raw TCP tự cài đặt (xem DEC-012), KHÔNG dùng MelsecMcNet để loại bỏ giới hạn
+                    // license process-level của HslCommunication.
+                    return new Mc3EBinaryClient { IpAddress = ip, Port = _port, NetworkNumber = _network, NetworkStationNumber = _station, ConnectTimeOut = 3000, ReceiveTimeOut = 3000 };
+                default:
+                    // DEC-013: HslCommunication đã bị loại bỏ hoàn toàn khỏi project. Các frame này
+                    // (ASCII/A1E/iQR) không dùng với hardware hiện tại (xem CLAUDE.md) và chưa có
+                    // bản raw-TCP thay thế — fail rõ ràng thay vì âm thầm sai.
+                    throw new NotSupportedException(
+                        $"Frame type {_frameType} không còn được hỗ trợ sau khi bỏ HslCommunication (DEC-013). " +
+                        "Chỉ QnA3E_Binary có raw TCP client (Mc3EBinaryClient). Cần viết client riêng cho frame này nếu thực sự cần dùng.");
             }
         }
 

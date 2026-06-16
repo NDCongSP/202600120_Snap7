@@ -1,4 +1,3 @@
-using HslCommunication;
 using McProtocolClientLib.Core;
 using McProtocolClientLib.Diagnostics;
 using McProtocolClientLib.Tags;
@@ -139,7 +138,7 @@ public class PlcGroupWriter
     {
         if (tag.NewValue == null) return;
 
-        var bt = (HslCommunication.Core.IByteTransform)_plc.Client.ByteTransform;
+        var bt = (IByteTransform)_plc.Client.ByteTransform;
 
         switch (tag.DataType)
         {

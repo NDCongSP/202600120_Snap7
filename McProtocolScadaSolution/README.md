@@ -159,7 +159,7 @@ sub.Subscribe(tags, intervalMs: 200);
 
 | Khía cạnh         | Snap7 (Siemens)                | MC Protocol (Mitsubishi)        |
 |-------------------|--------------------------------|---------------------------------|
-| Driver lib        | `Sharp7`                       | `HslCommunication`              |
+| Driver lib        | `Sharp7`                       | Raw TCP tự cài đặt (`Mc3EBinaryClient`) |
 | Endian word       | Big-endian                     | Little-endian (DCBA cho 32/64)  |
 | Địa chỉ           | `DB1.DBW0`, `DB1.DBX2.0`       | `D100`, `M100`, `D100.5`        |
 | String layout     | `MaxLen + CurLen + Data`       | ASCII liên tục, 2 char/word     |
@@ -176,11 +176,12 @@ sub.Subscribe(tags, intervalMs: 200);
 4. **Watchdog** dùng `Read("D0",1)` rất nhẹ → an toàn cho mọi PLC.
 5. **String** Mitsubishi không có header. `StringLength` = số ký tự ASCII, sẽ được pad
    `\0` cho đủ word. Khi đọc về sẽ tự cắt ở `\0` đầu tiên.
-6. **Endian** xử lý tự động qua `IByteTransform` của HslCommunication — không tự code lại.
+6. **Endian** xử lý tự động qua `IByteTransform` tự viết (xem `ByteTransform.cs`) — không tự code lại
+   ở từng tag.
 
 ## Yêu cầu môi trường
 
 - .NET SDK 8.0+
-- NuGet: `HslCommunication`, `Microsoft.Data.Sqlite`, `Newtonsoft.Json`
+- NuGet: `Microsoft.Data.Sqlite`, `Newtonsoft.Json` (KHÔNG còn phụ thuộc `HslCommunication` — xem DEC-013)
 - PLC Mitsubishi đã bật **MC Protocol** trên cổng Ethernet (cấu hình tại
   *GX Works2/3 → Parameter → Built-in Ethernet Port → Open Setting*)

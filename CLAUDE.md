@@ -220,9 +220,24 @@ var wordCount = (StringLength + 1) / 2; // chia StringLength+1 cho 2
 ```yaml
 active_context:
   current_task: >
-    Session 8: Thêm PlcLogger (text file) + watchdog wake-on-error (SemaphoreSlim) +
-    unit tests 61/61 PASS. Log file cho phép chẩn đoán nguyên nhân reconnect thất bại
-    khi chạy app thật với PLC.
+    Session 11: Bỏ HOÀN TOÀN dependency HslCommunication khỏi project (yêu cầu user: "BO LUON
+    THU VIEN HslCommunication"). PackageReference đã được gỡ khỏi McProtocolScada.Lib.csproj
+    từ trước (code không còn compile được) — task này viết lại các phần còn phụ thuộc:
+    (1) OperateResult.cs (mới) — OperateResult/OperateResult<T> tự viết thay HslCommunication.OperateResult;
+    (2) ByteTransform.cs (mới) — IByteTransform/RegularByteTransform tự viết. Đã XÁC NHẬN BẰNG THỰC
+    NGHIỆM (chạy RegularByteTransform thật của HslCommunication 11.6.4 qua probe project tham chiếu
+    trực tiếp DLL trong NuGet cache) rằng DataFormat.DCBA = little-endian thuần, KHÔNG hoán đổi byte/word
+    nào — nên class tự viết chỉ cần delegate sang BitConverter, không cần enum DataFormat (ABCD/BADC/CDAB
+    không bao giờ được dùng trong project này);
+    (3) Mc3EBinaryClient.cs — bỏ `using HslCommunication`/`HslCommunication.Core`, ByteTransform giờ
+    là `new RegularByteTransform()` (tự viết, không cần DataFormat tham số vì chỉ có 1 hành vi);
+    (4) PlcGroupReader.cs/PlcGroupWriter.cs — bỏ `using HslCommunication`, cast IByteTransform giờ
+    trỏ về type tự viết trong McProtocolClientLib.Core;
+    (5) PlcClient.cs — bỏ `using HslCommunication.Profinet.Melsec`; CreateClient() chỉ còn case
+    QnA3E_Binary (Mc3EBinaryClient); 4 frame type còn lại (ASCII/A1E/iQR) — đã xác nhận KHÔNG dùng
+    với hardware hiện tại — throw NotSupportedException rõ ràng thay vì âm thầm sai, vì chưa có
+    bản raw-TCP thay thế cho các frame đó.
+    Build 0 error/0 warning, 97/97 test PASS (không cần sửa test vì hành vi IByteTransform giữ nguyên).
   branch:         "PLC_Mitsubishi_MC_Protocol_Dev"
   plc_hardware:
     series:        "Mitsubishi MELSEC-Q"
@@ -234,29 +249,38 @@ active_context:
     note:          "Port 8000 = MC Protocol (Open Setting Line 2). Station=0 (=0xFF gây timeout). Pingable dùng ICMP tránh làm đầy connection table Q series (~8 slots)."
   related_files:
     - "McProtocolScadaSolution/McProtocolScada.Core/Core/PlcClient.cs"
+    - "McProtocolScadaSolution/McProtocolScada.Core/Core/Mc3EBinaryClient.cs"
+    - "McProtocolScadaSolution/McProtocolScada.Core/Core/OperateResult.cs"
+    - "McProtocolScadaSolution/McProtocolScada.Core/Core/ByteTransform.cs"
     - "McProtocolScadaSolution/McProtocolScada.Core/IO/PlcGroupReader.cs"
+    - "McProtocolScadaSolution/McProtocolScada.Core/IO/PlcGroupWriter.cs"
     - "McProtocolScadaSolution/McProtocolScada.Core/Diagnostics/PlcLogger.cs"
     - "McProtocolScadaSolution/McProtocolScada.Core/Tags/PlcAddressParser.cs"
     - "McProtocolScadaSolution/McProtocolScada.WinFormsTest/Form1.cs"
     - "McProtocolScadaSolution/McProtocolScada.WinFormsTest/tags.json"
-    - "McProtocolScadaSolution/McProtocolScada.Tests/"
+    - "McProtocolScadaSolution/McProtocolScada.Tests/Mc3EBinaryClientTests.cs"
   verified_ok:
-    - "Build: 0 error 0 warning (2026-06-15)"
-    - "Unit tests: 61/61 PASS (PlcAddressParser 44, BlockSplitter 11, PlcClientState 16)"
-    - "NotifyError_WakesWatchdog_WithinShortTime: PASS — SemaphoreSlim wake-up < 1s"
-    - "PlcLogger: tạo logs/plc_YYYYMMDD.log trong AppBase (thư mục Debug output)"
-    - "PlcClient kết nối OK: Q06UDV 192.168.11.1:8000, QnA3E_Binary, Station=0"
-    - "Read thành công: Part=546, PartName=CW180-WS-1(String), StepRun event OK"
+    - "Build: 0 error 0 warning (2026-06-16, sau khi bỏ HslCommunication hoàn toàn)"
+    - "Unit tests: 97/97 PASS — không cần sửa test, hành vi IByteTransform tự viết giữ nguyên 100%"
+    - "RegularByteTransform tự viết đã xác nhận khớp byte-for-byte với HslCommunication thật (DataFormat.DCBA = little-endian thuần) qua probe project thực nghiệm"
+    - "BuildBatchReadRequest(D162) khớp byte-for-byte với capture thật từ PLC (TestRawAsync, Q06UDV 192.168.11.1:8000)"
+    - "ROOT CAUSE license limit (Session 9/DEC-011) ĐÃ XỬ LÝ TRIỆT ĐỂ — project không còn 1 dòng code nào gọi HslCommunication (PackageReference đã gỡ khỏi mọi .csproj)"
   next_steps:
-    - "1. CHẠY APP + mô phỏng mất kết nối → đọc [AppBase]/logs/plc_*.log"
-    - "  → Tìm line 'Connect() FAILED: ...' để biết nguyên nhân chính xác từ HslCommunication"
-    - "  → Nếu 'System authorization failed': HslCom library-level limit → cần raw TCP hoặc license"
-    - "  → Nếu 'timeout': Q series connection table full → investigate TCP cleanup"
-    - "2. Test Write từ ComboBox dạng 'PLC_1:Part' → verify PLC nhận đúng"
-    - "3. Verify plc_history.db ghi dữ liệu cho cả 3 PLC"
-  last_session:   "2026-06-15"
+    - "1. ƯU TIÊN CAO: test Mc3EBinaryClient với PLC thật Q06UDV — chạy app, đọc liên tục nhiều giờ,"
+    - "   xác nhận KHÔNG còn 'System authorization failed' và watchdog reconnect hoạt động đúng"
+    - "2. Verify Write (word D-register) hoạt động đúng trên PLC thật — chỉ Read đã được verify qua TestRawAsync trước đây"
+    - "3. RỦI RO CHƯA KIỂM CHỨNG: device code byte cho M/X/Y/B/W/R/ZR/SD/SW/SM/SB/L/F/S (chỉ D=0xA8 đã verify"
+    - "   thực tế) và bit-packing 2-điểm/byte cho ReadBool/Write(bool) — lấy từ tài liệu chuẩn, CHƯA test hardware."
+    - "   → Test kỹ các tag bit (StepRun, M-device nếu có) trước khi tin tưởng production"
+    - "4. Frame ASCII/A1E/iQR giờ throw NotSupportedException (không còn HslCommunication để fallback) —"
+    - "   nếu cần dùng thật thì phải viết raw-TCP client riêng cho từng frame đó (chưa làm, không cấp thiết)"
+    - "5. Test Write từ ComboBox dạng 'PLC_1:Part' → verify PLC nhận đúng"
+    - "6. Verify plc_history.db ghi dữ liệu cho cả 3 PLC"
+  last_session:   "2026-06-16"
   open_questions:
-    - "HslCommunication authorization: library-level hay instance-level? Log sẽ xác nhận."
+    - "Device code byte ngoài D (0xA8) — đúng theo tài liệu chuẩn nhưng CHƯA verify trên Q06UDV thật"
+    - "Bit-packing nibble (low=chẵn, high=lẻ) cho M/X/Y/B — CHƯA verify trên hardware, chỉ có round-trip unit test logic"
+    - "ASCII/A1E/iQR frame: throw NotSupportedException — nếu sau này cần dùng, phải viết raw-TCP client riêng (không còn HslCommunication để dùng tạm)"
   simulator_note: >
     GX Simulator (GX Works2 built-in) chỉ nhận MELSOFT connection, KHÔNG hỗ trợ MC Protocol
     từ HslCommunication. Phải dùng PLC thật Q06UDV hoặc MC Protocol Simulator bên thứ ba.
@@ -273,9 +297,12 @@ active_context:
 | DEC-005 | 2026-06-07 | String Mitsubishi: LOW_BYTE=ký tự đầu, KHÔNG swap byte | `IO/PlcGroupReader.cs`, `IO/PlcGroupWriter.cs` |
 | DEC-006 | 2026-06-07 | String tag: Length=chars (10 word×2char=Length 20), tương tự Snap7 | `tags.json` |
 | DEC-007 | 2026-06-07 | Station=0 trong tags.json (NetworkStationNumber=0 cho Q series direct Ethernet); Station=255 gây timeout | `tags.json`, `Core/PlcClient.cs` |
-| DEC-008 | 2026-06-12 | Connect() luôn recreate HslComm instance (_client mutable) — HslCommunication "System authorization failed" chỉ tự recover khi tạo instance mới | `Core/PlcClient.cs` |
+| DEC-008 | 2026-06-12 | ~~Connect() luôn recreate HslComm instance (_client mutable)~~ — **REVERTED bởi DEC-011** | `Core/PlcClient.cs` |
 | DEC-009 | 2026-06-12 | PlcGroupReader KHÔNG gọi EnsureConnected() — watchdog là sole reconnect, tránh concurrent Connect() flood | `Core/PlcClient.cs`, `IO/PlcGroupReader.cs` |
+| DEC-011 | 2026-06-16 | **REVERT DEC-008**: _client readonly, KHÔNG recreate. Bằng chứng từ log thật (plc_20260616.log): "System authorization failed... Active device number" tăng dần liên tục (~1780 lần) bất kể recreate instance bao nhiêu lần → lỗi là **license limit của HslCommunication ở mức process**, không phải state riêng của 1 instance. Recreate chỉ làm cạn counter nhanh hơn. Thêm `PlcClient.IsAuthorizationError()` để nhận diện lỗi này riêng + `IsLicenseLimited` property + watchdog backoff 60s (thay vì retry 3s vô nghĩa khi đã biết là lỗi license, không phải lỗi mạng tạm thời) | `Core/PlcClient.cs`, `WinFormsTest/Form1.cs` |
 | DEC-010 | 2026-06-15 | Watchdog dùng SemaphoreSlim.WaitAsync thay Task.Delay → NotifyError() wake watchdog ngay, không đợi interval | `Core/PlcClient.cs` |
+| DEC-012 | 2026-06-16 | Viết `Mc3EBinaryClient` (raw TCP tự cài đặt QnA-3E Binary frame) thay `HslCommunication.MelsecMcNet` cho frame QnA3E_Binary — loại bỏ HOÀN TOÀN giới hạn license process-level (DEC-011) vì không còn gọi HslCommunication trên đường dữ liệu chính. API khớp 1-1 (Read/ReadBool/Write/ConnectClose/ByteTransform) nên PlcGroupReader/Writer không cần sửa. Giữ ByteTransform=RegularByteTransform(DataFormat.DCBA) khớp default MelsecMcNet. Frame đã verify byte-for-byte với capture PLC thật (D162); device code ngoài D và bit-packing CHƯA verify hardware. Các frame ASCII/A1E/iQR (không dùng) vẫn giữ HslCommunication | `Core/Mc3EBinaryClient.cs` (mới), `Core/PlcClient.cs` |
+| DEC-013 | 2026-06-16 | Bỏ HOÀN TOÀN dependency HslCommunication khỏi project (yêu cầu user). Viết `OperateResult`/`OperateResult<T>` và `IByteTransform`/`RegularByteTransform` tự có (POCO đơn giản). Xác nhận bằng thực nghiệm (chạy thật `RegularByteTransform` của HslCommunication 11.6.4 qua probe project tham chiếu DLL trong NuGet cache) rằng `DataFormat.DCBA` = little-endian thuần, không hoán đổi byte/word — nên bản tự viết bỏ luôn enum DataFormat, chỉ delegate sang `BitConverter`. `PlcClient.CreateClient()` chỉ còn case QnA3E_Binary; 4 frame ASCII/A1E/iQR (xác nhận không dùng) giờ throw `NotSupportedException` vì không còn HslCommunication để dùng tạm. Build 0 error/0 warning, 97/97 test PASS không cần sửa | `Core/OperateResult.cs` (mới), `Core/ByteTransform.cs` (mới), `Core/Mc3EBinaryClient.cs`, `Core/PlcClient.cs`, `IO/PlcGroupReader.cs`, `IO/PlcGroupWriter.cs` |
 
 ### 4.3 Hướng dẫn Claude đọc context
 
@@ -291,6 +318,66 @@ Khi bắt đầu session mới, Claude PHẢI:
 
 > Format: `[YYYY-MM-DD] [TYPE] [File/Module] — Mô tả`  
 > Types: `FEAT` · `FIX` · `REFACTOR` · `PERF` · `TEST` · `DOCS` · `CHORE` · `BREAK`
+
+---
+
+### [2026-06-16] — Session 11 (Bỏ HOÀN TOÀN dependency HslCommunication)
+
+```
+[FEAT]  McProtocolScada.Core/Core/OperateResult.cs          — NEW: OperateResult/OperateResult<T> tự viết thay HslCommunication.OperateResult (IsSuccess/Message/ErrorCode/Content + CreateSuccessResult)
+[FEAT]  McProtocolScada.Core/Core/ByteTransform.cs           — NEW: IByteTransform/RegularByteTransform tự viết, hành vi = DataFormat.DCBA (little-endian thuần, không enum DataFormat vì chỉ dùng 1 hành vi)
+[FIX]   McProtocolScada.Core/Core/Mc3EBinaryClient.cs        — Bỏ using HslCommunication/HslCommunication.Core; ByteTransform = new RegularByteTransform() (tự viết)
+[FIX]   McProtocolScada.Core/IO/PlcGroupReader.cs            — Bỏ using HslCommunication; cast IByteTransform trỏ về type tự viết trong McProtocolClientLib.Core
+[FIX]   McProtocolScada.Core/IO/PlcGroupWriter.cs            — Bỏ using HslCommunication; cast IByteTransform trỏ về type tự viết trong McProtocolClientLib.Core
+[FIX]   McProtocolScada.Core/Core/PlcClient.cs               — Bỏ using HslCommunication.Profinet.Melsec; CreateClient() chỉ còn case QnA3E_Binary, 4 frame ASCII/A1E/iQR throw NotSupportedException (DEC-013)
+[CHORE] McProtocolScadaSolution/README.md                    — Cập nhật bảng so sánh + yêu cầu môi trường: không còn NuGet HslCommunication
+[BUILD] Build 0 error 0 warning — 2026-06-16
+[TEST]  97/97 tests PASS (không cần sửa test) — 2026-06-16
+[DOCS]  CLAUDE.md                                            — Thêm DEC-013, active_context, CHANGELOG Session 11
+[VERIFY] RegularByteTransform tự viết xác nhận khớp byte-for-byte với HslCommunication 11.6.4 thật qua probe project tham chiếu trực tiếp DLL trong NuGet cache (~/.nuget/packages/hslcommunication)
+[RISK]  Frame ASCII/A1E/iQR (không dùng với hardware hiện tại) giờ KHÔNG còn hoạt động được (throw NotSupportedException) — cần viết raw-TCP riêng nếu sau này cần dùng
+```
+
+---
+
+### [2026-06-16] — Session 10 (Raw TCP MC Protocol — loại bỏ HslCommunication license dependency)
+
+```
+[FEAT]  McProtocolScada.Core/Core/Mc3EBinaryClient.cs       — NEW: raw TCP client tự cài đặt MC Protocol QnA-3E Binary (Read/ReadBool/Write/ConnectClose/ByteTransform khớp API MelsecMcNet)
+[FEAT]  McProtocolScada.Core/Core/Mc3EBinaryClient.cs       — TryParseAddress: parse D/W/R/ZR/SD/SW/M/L/F/S/SM/X/Y/B/SB, dùng PlcDeviceCode.Resolve() cho radix (khớp hành vi hiện có, vd W=DEC)
+[FEAT]  McProtocolScada.Core/Core/Mc3EBinaryClient.cs       — BuildBatchReadRequest/BuildBatchWriteRequest/BuildFrame: command 0x0401 (read)/0x1401 (write), subcommand word/bit units, frame QnA-3E Binary đầy đủ
+[FEAT]  McProtocolScada.Core/Core/Mc3EBinaryClient.cs       — SendReceive: short-connection TCP (mở/đóng mỗi request) giữ đúng convention Session 3, đọc header 9 byte rồi đọc đủ body theo dataLength
+[FEAT]  McProtocolScada.Core/Core/Mc3EBinaryClient.cs       — ByteTransform = RegularByteTransform(DataFormat.DCBA) — khớp default MelsecMcNet (xác nhận qua reflection) để không phá decode DWord/Real/LReal
+[FIX]   McProtocolScada.Core/Core/PlcClient.cs              — CreateClient(): case QnA3E_Binary đổi từ MelsecMcNet sang Mc3EBinaryClient (DEC-012); các frame ASCII/A1E/iQR (không dùng) giữ HslCommunication
+[TEST]  McProtocolScada.Tests/Mc3EBinaryClientTests.cs      — NEW: 27 test case — frame encoding byte-exact match với capture PLC thật (D162), address parsing 16 device type, bit-packing nibble round-trip
+[BUILD] Build 0 error 0 warning — 2026-06-16
+[TEST]  97/97 tests PASS — 2026-06-16
+[DOCS]  CLAUDE.md                                           — Cập nhật active_context, DEC-012, CHANGELOG Session 10
+[RISK]  Device code byte ngoài D (0xA8) và bit-packing nibble CHƯA verify trên PLC thật — chỉ D-register word read đã confirm qua TestRawAsync gốc
+```
+
+---
+
+### [2026-06-16] — Session 9 (ROOT CAUSE CONFIRMED: HslCommunication license limit — revert DEC-008)
+
+```
+[FIX]   McProtocolScada.Core/Core/PlcClient.cs              — REVERT DEC-008: _client lại thành readonly, KHÔNG recreate instance mỗi Connect()
+[FEAT]  McProtocolScada.Core/Core/PlcClient.cs              — Thêm IsAuthorizationError(string?) static — nhận diện "System authorization failed" (HslCommunication license error)
+[FEAT]  McProtocolScada.Core/Core/PlcClient.cs              — Thêm IsLicenseLimited property — phân biệt lỗi license vs lỗi mạng/PLC thật cho UI/watchdog
+[FIX]   McProtocolScada.Core/Core/PlcClient.cs              — Watchdog: backoff 60s khi _licenseLimited=true (thay vì retry 3s vô nghĩa — lỗi license không tự sửa bằng retry nhanh)
+[FIX]   McProtocolScada.WinFormsTest/Form1.cs               — lblStatus hiển thị "(LICENSE LIMIT)" khi client.IsLicenseLimited=true, giúp operator phân biệt lỗi license vs lỗi PLC
+[TEST]  McProtocolScada.Tests/PlcClientStateTests.cs        — Thêm 9 test: IsAuthorizationError (7 case message khác nhau) + Connect_ToNonExistentHost_IsNotLicenseLimited
+[DOCS]  CLAUDE.md                                            — DEC-011 (revert DEC-008 với bằng chứng log thật), active_context: root cause confirmed = library/process-level license limit, KHÔNG phải PLC/mạng
+[BUILD] Build 0 error 0 warning — 2026-06-16
+[TEST]  70/70 tests PASS — 2026-06-16
+[ROOT CAUSE] Log thực tế plc_20260616.log: "System authorization failed... Active device number: 12687" tăng dần liên tục
+             (~1780 lần fail) trên CẢ 3 PLC đồng thời, trong khi ping cả 3 PLC đều 0% packet loss (xác nhận qua ảnh user gửi).
+             → KẾT LUẬN: lỗi 100% từ thư viện HslCommunication (free-tier license usage cap, process-wide),
+             KHÔNG phải lỗi PLC hay lỗi mạng. DEC-008 (recreate instance) không sửa được lỗi này — chỉ làm
+             counter cạn nhanh hơn vì mỗi instance mới vẫn tính vào cùng 1 counter process-level.
+[PENDING] Cần quyết định từ user: (a) mua license HslCommunication, (b) thử downgrade version cũ, hoặc
+          (c) viết raw TCP MC Protocol thay HslCommunication hoàn toàn (đã có PoC TestRawAsync() đọc D162 OK)
+```
 
 ---
 

@@ -1,4 +1,3 @@
-using HslCommunication;
 using McProtocolClientLib.Core;
 using McProtocolClientLib.Diagnostics;
 using McProtocolClientLib.Tags;
@@ -140,7 +139,7 @@ public class PlcGroupReader
     /// </summary>
     private object DecodeWordValue(byte[] b, int i, PlcTag t)
     {
-        var bt = (HslCommunication.Core.IByteTransform)_plc.Client.ByteTransform;
+        var bt = (IByteTransform)_plc.Client.ByteTransform;
 
         switch (t.DataType)
         {
