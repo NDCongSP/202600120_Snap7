@@ -1,4 +1,3 @@
-using HslCommunication;
 using McProtocolClientLib.Core;
 using McProtocolClientLib.Diagnostics;
 using McProtocolClientLib.Tags;
@@ -50,7 +49,13 @@ public class PlcGroupReader
         {
             try
             {
-                _plc.EnsureConnected();
+                // Không gọi EnsureConnected() ở đây để tránh concurrent Connect() flood.
+                // Watchdog là sole reconnect mechanism. Nếu chưa Connected, bỏ qua polling cycle này.
+                if (_plc.State != PlcConnectionState.Connected)
+                {
+                    OnReadError?.Invoke("PLC not connected");
+                    return;
+                }
 
                 var list = tags.ToList();
 
@@ -70,7 +75,10 @@ public class PlcGroupReader
                 foreach (var tag in tags)
                     tag.Status = PlcConnectionState.Disconnected;
 
-                // Báo PlcClient biết để watchdog kích hoạt reconnect
+                // Log exact HslCommunication error để chẩn đoán nguyên nhân mất kết nối
+                PlcLogger.Warn($"[{_plc.Host}:{_plc.Port}] ReadGroup FAIL: {ex.Message}");
+
+                // Báo PlcClient biết để watchdog kích hoạt reconnect ngay
                 _plc.NotifyError();
                 OnReadError?.Invoke(ex.Message);
             }
@@ -131,7 +139,7 @@ public class PlcGroupReader
     /// </summary>
     private object DecodeWordValue(byte[] b, int i, PlcTag t)
     {
-        var bt = (HslCommunication.Core.IByteTransform)_plc.Client.ByteTransform;
+        var bt = (IByteTransform)_plc.Client.ByteTransform;
 
         switch (t.DataType)
         {
