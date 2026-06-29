@@ -1,7 +1,7 @@
 [
   {
     "Name": "PLC_1",
-    "Host": "192.168.1.100",
+    "Host": "phucthinhautomation.ddns.net",
     "Rack": 0,
     "Slot": 1,
     "Tags": [
@@ -11,17 +11,17 @@
         "DataType": "Word"
       },
       {
-        "Name": "RJ1",
-        "Address": "DB1.DBB14",
-        "DataType": "Word"
-      },
-      {
         "Name": "S2",
         "Address": "DB1.DBB2",
         "DataType": "Word"
       },
       {
-        "Name": "METAL_RESULT",
+        "Name": "RJ1",
+        "Address": "DB1.DBB14",
+        "DataType": "Word"
+      },
+      {
+        "Name": "Metal_Result",
         "Address": "DB1.DBB10",
         "DataType": "Word"
       },
@@ -32,12 +32,12 @@
       },
       {
         "Name": "S3",
-        "Address": "DB1.DBB32",
+        "Address": "DB1.DBB33",
         "DataType": "Word"
       },
       {
         "Name": "S5",
-        "Address": "DB1.DBB6",
+        "Address": "DB1.DBB35",
         "DataType": "Word"
       },
       {
@@ -55,7 +55,7 @@
         "DataType": "Word"
       },
       {
-        "Name": "StableSccaleValue",
+        "Name": "Scale_Value_Stable",
         "Address": "DB1.DBB28",
         "DataType": "Real",
         "Deadband": 0.01,
