@@ -44,25 +44,83 @@ namespace Snap7Scada.WinFormsTest
             // Build one grid row + one combo entry per tag.
             BuildTagRows();
 
-            // 1) Subscription manager
+            // Subscription manager (one instance for the whole form lifetime).
             _sub = new PlcSubscriptionManager(_plcRuntime.Reader);
             _sub.OnValueChanged += Sub_OnValueChanged;
 
-            // 2) Connect + watchdog
+            lblHost.Text = $"Host: {_plc1Client.Host}   •   Port: {_plc1Client.Port}   •   Rack: {_plc1Client.Rack}   Slot: {_plc1Client.Slot}";
+            if (_cbTagName.Items.Count > 0)
+                _cbTagName.SelectedIndex = 0;
+
+            await ConnectPlcAsync();
+        }
+
+        /// <summary>
+        /// Connects the PLC, starts the watchdog, does a first read and starts polling.
+        /// </summary>
+        private async Task ConnectPlcAsync()
+        {
             await _plc1Client.ConnectAsync();
             _plc1Client.StartWatchdog(2000);
 
-            // 3) First read so the grid is populated immediately.
+            // First read so the grid is populated immediately.
             await _plcRuntime.Reader.ReadGroupAsync(_plcRuntime.Tags);
             foreach (var tag in _plcRuntime.Tags)
                 UpdateGridRow(tag);
 
-            // 4) Start polling.
+            // Subscribe() stops any previous session first, so reconnect is safe.
             _sub.Subscribe(_plcRuntime.Tags, intervalMs: 200);
+        }
 
-            lblHost.Text = $"Host: {_plc1Client.Host}";
-            if (_cbTagName.Items.Count > 0)
-                _cbTagName.SelectedIndex = 0;
+        /// <summary>
+        /// Stops polling + watchdog and closes the TCP connection.
+        /// </summary>
+        private void DisconnectPlc()
+        {
+            _sub?.Stop();
+            _plc1Client?.StopWatchdog();
+            _plc1Client?.Disconnect();
+        }
+
+        private async void btnConnect_Click(object sender, EventArgs e)
+        {
+            if (_plc1Client == null) return;
+
+            btnConnect.Enabled = false;
+            try
+            {
+                bool isLive = _plc1Client.State is PlcConnectionState.Connected
+                    or PlcConnectionState.Connecting
+                    or PlcConnectionState.Reconnecting;
+
+                if (isLive)
+                    DisconnectPlc();
+                else
+                    await ConnectPlcAsync();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Connection error: {ex.Message}", "Connection",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                btnConnect.Enabled = true;
+                UpdateConnectButton(_plc1Client.State);
+            }
+        }
+
+        /// <summary>Sets the toggle button caption/color to match the connection state.</summary>
+        private void UpdateConnectButton(PlcConnectionState state)
+        {
+            bool isLive = state is PlcConnectionState.Connected
+                or PlcConnectionState.Connecting
+                or PlcConnectionState.Reconnecting;
+
+            btnConnect.Text = isLive ? "Disconnect" : "Connect";
+            btnConnect.BackColor = isLive
+                ? Color.FromArgb(60, 60, 62)
+                : Color.FromArgb(0, 122, 204);
         }
 
         /// <summary>
@@ -141,6 +199,8 @@ namespace Snap7Scada.WinFormsTest
                 PlcConnectionState.Error => Color.Tomato,
                 _ => Color.Silver
             };
+
+            UpdateConnectButton(state);
         }
 
         /// <summary>

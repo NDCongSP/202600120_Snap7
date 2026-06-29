@@ -42,6 +42,17 @@ namespace Snap7ClientLib.Core
         }
 
 
+        /// <summary>
+        /// Cổng TCP của giao thức S7 (ISO-on-TCP / RFC1006) — luôn cố định 102.
+        /// </summary>
+        public int Port => 102;
+
+        /// <summary>Số rack của CPU (S7 addressing).</summary>
+        public int Rack => _rack;
+
+        /// <summary>Số slot của CPU (S7 addressing).</summary>
+        public int Slot => _slot;
+
         public PlcClient(string host, int rack = 0, int slot = 1)
         {
             _host = host;

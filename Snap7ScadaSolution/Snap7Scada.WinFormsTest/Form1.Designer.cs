@@ -29,6 +29,7 @@ namespace Snap7Scada.WinFormsTest
         private void InitializeComponent()
         {
             pnlTop = new Panel();
+            btnConnect = new Button();
             lblHost = new Label();
             lblStatus = new Label();
             lblStatusCaption = new Label();
@@ -56,6 +57,7 @@ namespace Snap7Scada.WinFormsTest
             // pnlTop
             //
             pnlTop.BackColor = Color.FromArgb(37, 37, 38);
+            pnlTop.Controls.Add(btnConnect);
             pnlTop.Controls.Add(lblHost);
             pnlTop.Controls.Add(lblStatus);
             pnlTop.Controls.Add(lblStatusCaption);
@@ -65,6 +67,21 @@ namespace Snap7Scada.WinFormsTest
             pnlTop.Padding = new Padding(12, 0, 12, 0);
             pnlTop.Size = new Size(1004, 48);
             pnlTop.TabIndex = 0;
+            //
+            // btnConnect
+            //
+            btnConnect.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            btnConnect.BackColor = Color.FromArgb(60, 60, 62);
+            btnConnect.FlatStyle = FlatStyle.Flat;
+            btnConnect.Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold);
+            btnConnect.ForeColor = Color.White;
+            btnConnect.Location = new Point(864, 8);
+            btnConnect.Name = "btnConnect";
+            btnConnect.Size = new Size(128, 32);
+            btnConnect.TabIndex = 3;
+            btnConnect.Text = "Disconnect";
+            btnConnect.UseVisualStyleBackColor = false;
+            btnConnect.Click += btnConnect_Click;
             //
             // lblHost
             //
@@ -292,6 +309,7 @@ namespace Snap7Scada.WinFormsTest
         private Label lblStatusCaption;
         private Label lblStatus;
         private Label lblHost;
+        private Button btnConnect;
         private DataGridView grid;
         private DataGridViewTextBoxColumn colName;
         private DataGridViewTextBoxColumn colAddress;
