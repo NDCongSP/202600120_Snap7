@@ -1,289 +1,242 @@
-﻿using Microsoft.VisualBasic.Logging;
 using Snap7ClientLib.Core;
-using Snap7ClientLib.Historian;
 using Snap7ClientLib.Tags;
-using System.Diagnostics;
-using System.Windows.Forms;
-using System.Xml.Linq;
-using static System.Windows.Forms.VisualStyles.VisualStyleElement;
 
 namespace Snap7Scada.WinFormsTest
 {
+    /// <summary>
+    /// Test harness for the Snap7 SCADA driver: live tag monitor (DataGridView) + write panel.
+    /// </summary>
+    /// <remarks>
+    /// File: Snap7Scada.WinFormsTest/Form1.cs
+    /// </remarks>
     public partial class Form1 : Form
     {
         PlcManager _manager = new PlcManager();
         PlcRuntime _plcRuntime;
         PlcClient _plc1Client;
         PlcSubscriptionManager _sub;
-        SqliteHistorian _historian;
 
-        private CancellationTokenSource _readModbusCts;
-        private Task _readModbusTask;
-
-        string _scaleValue = string.Empty;
-        string _isCheck = string.Empty;
-        string _qrMetal = string.Empty;
+        // Map tag name -> grid row so live updates hit the right row in O(1).
+        private readonly Dictionary<string, DataGridViewRow> _rowByTag = new();
 
         public Form1()
         {
             InitializeComponent();
-
             this.FormClosing += Form1_FormClosing;
         }
 
         private void Form1_FormClosing(object? sender, FormClosingEventArgs e)
         {
-            // 1.Dừng vòng lặp Modbus
-            _readModbusCts?.Cancel();
-
-            // 2. Dừng Polling của Snap7
-            _sub?.Stop();
-
-            // 3. Hủy kết nối PLC (Dừng Watchdog và ngắt TCP)
-            _plc1Client.Dispose(); // Sẽ dừng watchdog và ngắt kết nối
-
+            _sub?.Stop();                 // Stop polling
+            _plc1Client?.Dispose();       // Stop watchdog + close TCP
         }
 
         private async void Form1_Load(object sender, EventArgs e)
         {
             _manager.LoadFromConfig("tags.json");
-            //_manager.LoadFromConfig("tags1.json");
 
-            //tùy vào hệ thống kết nối bao nhiêu PLC để gọi kết nối đến PLC tương ứng
             _plcRuntime = _manager.GetPlc("PLC_1");
-            _plc1Client = _plcRuntime.Client; // Lưu vào biến toàn cục
+            _plc1Client = _plcRuntime.Client;
 
-            // ĐĂNG KÝ SỰ KIỆN TRƯỚC KHI KẾT NỐI
+            // Subscribe to events BEFORE connecting.
             _plc1Client.StateChanged += Client_StateChanged;
 
-            await _plcRuntime.Reader.ReadGroupAsync(_plcRuntime.Tags);
+            // Build one grid row + one combo entry per tag.
+            BuildTagRows();
 
-
-            // 1) Tạo và gán handler
+            // 1) Subscription manager
             _sub = new PlcSubscriptionManager(_plcRuntime.Reader);
             _sub.OnValueChanged += Sub_OnValueChanged;
 
-
-
-            //// Ví dụ đăng ký cho từng tag cụ thể trong Form_Load
-            //var tagScaleValue = _plcRuntime.Tags.FirstOrDefault(t => t.Name == "ScaleValue");
-            //if (tagScaleValue != null)
-            //{
-            //    tagScaleValue.ValueChanged += (tag) =>
-            //    {
-            //        Debug.WriteLine($"{DateTime.Now:O} [{tag.Name}] {tag.LastValue} -> {tag.NewValue} ({tag.DataType}) -> Deadband:{tag.Deadband}");
-            //    };
-            //}
-
-            //var tagIsChecck = _plcRuntime.Tags.FirstOrDefault(t => t.Name == "IsCheck");
-            //if (tagIsChecck != null)
-            //{
-            //    tagIsChecck.ValueChanged += (tag) =>
-            //    {
-            //        Debug.WriteLine($"{DateTime.Now:O} [{tag.Name}] {tag.LastValue} -> {tag.NewValue} ({tag.DataType}) -> Deadband:{tag.Deadband}");
-            //    };
-            //}
-
-
-            //_plcRuntime.Tags.FirstOrDefault(t => t.Name == "NewCodeMetal").ValueChanged += (tag) =>
-            //{
-            //    Debug.WriteLine($"{DateTime.Now:O} [{tag.Name}] {tag.LastValue} -> {tag.NewValue} ({tag.DataType}) -> Deadband:{tag.Deadband}");
-            //};
-
-            // 2) Kết nối PLC, chạy Polling
+            // 2) Connect + watchdog
             await _plc1Client.ConnectAsync();
             _plc1Client.StartWatchdog(2000);
 
-            // 3) (Tuỳ chọn) cập nhật UI lần đầu
+            // 3) First read so the grid is populated immediately.
+            await _plcRuntime.Reader.ReadGroupAsync(_plcRuntime.Tags);
             foreach (var tag in _plcRuntime.Tags)
-                tag.RaiseValueChanged();//Tự "bắn" sự kiện để UI cập nhật ngay giá trị ban đầu
+                UpdateGridRow(tag);
 
-            // 4) BẮT ĐẦU POLLING (rất quan trọng)
+            // 4) Start polling.
             _sub.Subscribe(_plcRuntime.Tags, intervalMs: 200);
 
-
-            //run thread đọc modbus, để đọc các giá trị cân
-            _readModbusCts = new CancellationTokenSource();
-            _readModbusTask = Task.Run(() => TaskReadPlcAsync(_readModbusCts.Token));
-
-            _cbTagName.Items.AddRange(_plcRuntime.Tags.Select(x => x.Name).ToArray());
-
-            label1.Text = $"IP server: {_plc1Client.Host}";
+            lblHost.Text = $"Host: {_plc1Client.Host}";
+            if (_cbTagName.Items.Count > 0)
+                _cbTagName.SelectedIndex = 0;
         }
 
-        public async Task TaskReadPlcAsync(CancellationToken token)
+        /// <summary>
+        /// Creates one DataGridView row and one ComboBox entry per configured tag.
+        /// </summary>
+        private void BuildTagRows()
         {
-            while (!token.IsCancellationRequested)
+            grid.Rows.Clear();
+            _rowByTag.Clear();
+            _cbTagName.Items.Clear();
+
+            foreach (var tag in _plcRuntime.Tags)
             {
-                try
-                {
-                    foreach (var item in _plcRuntime.Tags)
-                    {
-                        if (InvokeRequired)
-                        {
-                            BeginInvoke((Action)(() =>
-                            {
-                                //listBox1.Items.Clear();
-                                //foreach (var t in _manager.GetPlc("PLC_1").Tags)
-                                //    listBox1.Items.Add($"{t.Name} = {t.NewValue}");
-
-                                //label1.Text = $"BoxIdScale: {_plcRuntime.Tags.FirstOrDefault(t => t.Name == "BoxIdScale").NewValue.ToString()}";
-                                //label2.Text = $"BoxIdMetal: {_plcRuntime.Tags.FirstOrDefault(t => t.Name == "BoxIdMetal").NewValue.ToString()}";
-                                //label3.Text = $"ScaleValue: {_plcRuntime.Tags.FirstOrDefault(t => t.Name == "ScaleValue").NewValue.ToString()}";
-
-                                UpdateListBoxItem(item);
-                            }));
-                        }
-                        else
-                        {
-                            //listBox1.Items.Clear();
-                            //foreach (var t in _manager.GetPlc("PLC_1").Tags)
-                            //    listBox1.Items.Add($"{t.Name} = {t.NewValue}");
-
-                            //label1.Text = $"BoxIdScale: {_plcRuntime.Tags.FirstOrDefault(t => t.Name == "BoxIdScale").NewValue.ToString()}";
-                            //label2.Text = $"BoxIdMetal: {_plcRuntime.Tags.FirstOrDefault(t => t.Name == "BoxIdMetal").NewValue.ToString()}";
-                            //label3.Text = $"ScaleValue: {_plcRuntime.Tags.FirstOrDefault(t => t.Name == "ScaleValue").NewValue.ToString()}";
-                            UpdateListBoxItem(item);
-                        }
-                    }
-
-                    await Task.Delay(3000, token); // nhịp kiểm tra, đủ nhẹ nhàng
-                }
-                catch (OperationCanceledException)
-                {
-                    // token.Cancel() => thoát vòng lặp
-                    break;
-                }
-                catch (Exception ex)
-                {
-                    // Không để task chết âm thầm
-                    await Task.Delay(500, token); // tạm nghỉ rồi thử lại
-                }
+                int idx = grid.Rows.Add(tag.Name, tag.Address, tag.DataType.ToString(), "", "", "—", "");
+                var row = grid.Rows[idx];
+                row.Tag = tag;
+                _rowByTag[tag.Name] = row;
+                _cbTagName.Items.Add(tag.Name);
             }
         }
 
         private void Sub_OnValueChanged(PlcTag tag)
         {
             if (InvokeRequired)
-            {
-                BeginInvoke(new Action(() => UpdateListBoxItem(tag)));
-            }
+                BeginInvoke(new Action(() => UpdateGridRow(tag)));
             else
-            {
-                UpdateListBoxItem(tag);
-            }
+                UpdateGridRow(tag);
         }
 
-        private void UpdateListBoxItem(PlcTag tag)
+        /// <summary>
+        /// Refreshes the grid row for a single tag (value, last value, status, timestamp).
+        /// </summary>
+        private void UpdateGridRow(PlcTag tag)
         {
-            string itemText = $"{DateTime.Now:O} [{tag.Name}] {tag.LastValue} -> {tag.NewValue} ({tag.DataType})";
+            if (!_rowByTag.TryGetValue(tag.Name, out var row))
+                return;
 
-            int foundIndex = -1;
+            row.Cells[colValue.Index].Value = FormatValue(tag.NewValue);
+            row.Cells[colLast.Index].Value = FormatValue(tag.LastValue);
+            row.Cells[colUpdated.Index].Value = DateTime.Now.ToString("HH:mm:ss.fff");
 
-            // 1. Tìm xem Tag này đã tồn tại trong ListBox chưa
-            for (int i = 0; i < listBox1.Items.Count; i++)
-            {
-                if (listBox1.Items[i].ToString().Contains(tag.Name))
-                {
-                    foundIndex = i;
-                    break;
-                }
-            }
+            bool ok = tag.Status == PlcConnectionState.Connected;
+            var statusCell = row.Cells[colStatus.Index];
+            statusCell.Value = ok ? "● OK" : "● " + tag.Status;
+            statusCell.Style.ForeColor = ok ? Color.SeaGreen : Color.Firebrick;
 
-            // 2. Nếu đã có thì cập nhật giá trị mới, nếu chưa thì thêm vào cuối
-            if (foundIndex != -1)
-            {
-                // Chỉ cập nhật nếu giá trị hiển thị thực sự khác đi để tránh vẽ lại vô ích
-                if (listBox1.Items[foundIndex].ToString() != itemText)
-                {
-                    listBox1.Items[foundIndex] = itemText;
-                }
-            }
+            // Highlight a value that just changed.
+            if (!Equals(tag.NewValue, tag.LastValue))
+                row.Cells[colValue.Index].Style.ForeColor = Color.FromArgb(0, 122, 204);
             else
-            {
-                listBox1.Items.Add(itemText);
-            }
+                row.Cells[colValue.Index].Style.ForeColor = Color.Black;
         }
 
-        private void Client_StateChanged(PlcConnectionState obj)
+        private static string FormatValue(object? value)
         {
+            if (value == null) return "—";
+            if (value is bool b) return b ? "TRUE" : "FALSE";
+            return value.ToString() ?? "—";
+        }
 
+        private void Client_StateChanged(PlcConnectionState state)
+        {
             if (InvokeRequired)
-            {
-                BeginInvoke((Action)(() =>
-                {
-                    lblStatus.Text = obj.ToString();
-                }));
-            }
+                BeginInvoke((Action)(() => ApplyState(state)));
             else
-            {
-                lblStatus.Text = obj.ToString();
-            }
+                ApplyState(state);
         }
 
-        private void label1_Click(object sender, EventArgs e)
+        private void ApplyState(PlcConnectionState state)
         {
+            lblStatus.Text = state.ToString();
+            lblStatus.ForeColor = state switch
+            {
+                PlcConnectionState.Connected => Color.FromArgb(76, 209, 100),
+                PlcConnectionState.Connecting or PlcConnectionState.Reconnecting => Color.Gold,
+                PlcConnectionState.Error => Color.Tomato,
+                _ => Color.Silver
+            };
+        }
 
+        /// <summary>
+        /// When a grid row is selected, mirror that tag into the write panel for quick testing.
+        /// </summary>
+        private void grid_SelectionChanged(object sender, EventArgs e)
+        {
+            if (grid.SelectedRows.Count == 0) return;
+            if (grid.SelectedRows[0].Tag is not PlcTag tag) return;
+
+            _cbTagName.SelectedItem = tag.Name;       // triggers _cbTagName_SelectedIndexChanged
+        }
+
+        /// <summary>
+        /// Updates the type hint and pre-fills the textbox with the current value of the chosen tag.
+        /// </summary>
+        private void _cbTagName_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            var tag = _plcRuntime?.Tags?.FirstOrDefault(t => t.Name == _cbTagName.Text);
+            if (tag == null) return;
+
+            lblTypeHint.Text = tag.DataType switch
+            {
+                PlcDataType.Bool => "Bool — enter: true / false / 1 / 0",
+                PlcDataType.String => "String — enter text",
+                PlcDataType.Real or PlcDataType.LReal => "Float — enter a decimal number (e.g. 50.5)",
+                _ => $"{tag.DataType} — enter an integer"
+            };
+            txtNewValue.Text = FormatValue(tag.NewValue) == "—" ? "" : FormatValue(tag.NewValue);
+        }
+
+        private async void btnReadNow_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                await _plcRuntime.Reader.ReadGroupAsync(_plcRuntime.Tags);
+                foreach (var tag in _plcRuntime.Tags)
+                    UpdateGridRow(tag);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Read PLC error: {ex.Message}", "Read",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
         }
 
         private async void button1_Click(object sender, EventArgs e)
         {
-            // Giả sử bạn đã có đối tượng writer được khởi tạo từ PlcClient
             var writer = _plcRuntime.Writer;
 
-            //// 1. Tạo danh sách các tag muốn ghi
-            //var tagsToWrite = new List<PlcTag>();
-
-            // Ghi số thực (Real) - Ví dụ thiết lập ngưỡng cân
-            //var tagWeightSet = _plcRuntime.Tags.First(t => t.Name == "ScaleValue");
-            //tagWeightSet.NewValue = 50.5f; // Gán giá trị mới
-            //tagsToWrite.Add(tagWeightSet);
-
-            //// Ghi giá trị Logic (Bool) - Ví dụ kích hoạt lệnh Check
-            //var tagCheck = _plcRuntime.Tags.First(t => t.Name == "IsCheck");
-            //tagCheck.NewValue = true;
-            //tagsToWrite.Add(tagCheck);
-
-            //// Ghi chuỗi ký tự (String) - Ví dụ mã QR
-            //var tagQr = _plcRuntime.Tags.First(t => t.Name == "BoxIdScale");
-            //tagQr.NewValue = "S7-1200-OK-2026";
-            //tagsToWrite.Add(tagQr);
-
-            //// 2. Thực thi ghi xuống PLC bất đồng bộ (không treo UI)
-            //await writer.WriteGroupAsync(tagsToWrite);
-
             var tag = _plcRuntime.Tags.FirstOrDefault(t => t.Name == _cbTagName.Text);
-
-            if (tag == null) return;
-
-            // 1. Chuyển đổi dữ liệu an toàn
-            object newValue = tag.DataType switch
+            if (tag == null)
             {
-                PlcDataType.String => _txtNewValue.Text,
-                PlcDataType.Bool => _txtNewValue.Text.ToLower() == "true" || _txtNewValue.Text == "1",
-                PlcDataType.Real or PlcDataType.LReal => double.TryParse(_txtNewValue.Text, out var d) ? d : 0.0,
-                _ => int.TryParse(_txtNewValue.Text, out var i) ? i : 0
-            };
+                MessageBox.Show("Please select a tag first.", "Write",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
 
-            // 2. CHỈ GHI TAG ĐANG CHỌN (Tối ưu cực quan trọng)
+            // Convert the textbox into the tag's runtime type.
+            string raw = txtNewValue.Text;
+            object newValue;
+            try
+            {
+                newValue = tag.DataType switch
+                {
+                    PlcDataType.String => raw,
+                    PlcDataType.Bool => raw.Trim().ToLower() is "true" or "1",
+                    PlcDataType.Real or PlcDataType.LReal => double.Parse(raw.Trim()),
+                    _ => int.Parse(raw.Trim())
+                };
+            }
+            catch (FormatException)
+            {
+                MessageBox.Show($"'{raw}' is not a valid {tag.DataType} value.", "Write",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
             tag.NewValue = newValue;
             var tagsToWrite = new List<PlcTag> { tag };
 
             try
             {
-                // Ghi bất đồng bộ để tránh đơ UI và không làm gián đoạn luồng đọc
+                btnWrite.Enabled = false;
                 await Task.Run(() => writer.WriteGroup(tagsToWrite));
-
-                // Cập nhật ngay giá trị LastWritten trong Dictionary của Writer (nếu có dùng WriteGroupOnlyChanged ở chỗ khác)
-                // writer.UpdateCache(tag); 
+                UpdateGridRow(tag);
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Write PLC error: {ex.Message}");
+                MessageBox.Show($"Write PLC error: {ex.Message}", "Write",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
-
-            //// Sử dụng hàm này nếu bạn gọi lệnh ghi trong một vòng lặp liên tục, ghi tất cả các tag.s
-            //writer.WriteGroupOnlyChanged(_plcRuntime.Tags);
+            finally
+            {
+                btnWrite.Enabled = true;
+            }
         }
     }
 }

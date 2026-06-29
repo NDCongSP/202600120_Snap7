@@ -1,4 +1,4 @@
-﻿namespace Snap7Scada.WinFormsTest
+namespace Snap7Scada.WinFormsTest
 {
     partial class Form1
     {
@@ -28,154 +28,285 @@
         /// </summary>
         private void InitializeComponent()
         {
+            pnlTop = new Panel();
+            lblHost = new Label();
             lblStatus = new Label();
-            listBox1 = new ListBox();
-            label1 = new Label();
-            label2 = new Label();
-            label3 = new Label();
-            button1 = new Button();
-            _txtNewValue = new TextBox();
+            lblStatusCaption = new Label();
+            grid = new DataGridView();
+            colName = new DataGridViewTextBoxColumn();
+            colAddress = new DataGridViewTextBoxColumn();
+            colType = new DataGridViewTextBoxColumn();
+            colValue = new DataGridViewTextBoxColumn();
+            colLast = new DataGridViewTextBoxColumn();
+            colStatus = new DataGridViewTextBoxColumn();
+            colUpdated = new DataGridViewTextBoxColumn();
+            grpWrite = new GroupBox();
+            lblTypeHint = new Label();
+            btnWrite = new Button();
+            txtNewValue = new TextBox();
             _cbTagName = new ComboBox();
-            label4 = new Label();
-            label5 = new Label();
-            label6 = new Label();
+            lblValueCaption = new Label();
+            lblTagCaption = new Label();
+            btnReadNow = new Button();
+            pnlTop.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)grid).BeginInit();
+            grpWrite.SuspendLayout();
             SuspendLayout();
-            // 
+            //
+            // pnlTop
+            //
+            pnlTop.BackColor = Color.FromArgb(37, 37, 38);
+            pnlTop.Controls.Add(lblHost);
+            pnlTop.Controls.Add(lblStatus);
+            pnlTop.Controls.Add(lblStatusCaption);
+            pnlTop.Dock = DockStyle.Top;
+            pnlTop.Location = new Point(0, 0);
+            pnlTop.Name = "pnlTop";
+            pnlTop.Padding = new Padding(12, 0, 12, 0);
+            pnlTop.Size = new Size(1004, 48);
+            pnlTop.TabIndex = 0;
+            //
+            // lblHost
+            //
+            lblHost.AutoSize = true;
+            lblHost.ForeColor = Color.Gainsboro;
+            lblHost.Location = new Point(360, 16);
+            lblHost.Name = "lblHost";
+            lblHost.Size = new Size(72, 15);
+            lblHost.TabIndex = 2;
+            lblHost.Text = "Host: (none)";
+            //
             // lblStatus
-            // 
+            //
             lblStatus.AutoSize = true;
-            lblStatus.Location = new Point(12, 9);
+            lblStatus.Font = new Font("Segoe UI Semibold", 9.75F, FontStyle.Bold);
+            lblStatus.ForeColor = Color.Silver;
+            lblStatus.Location = new Point(72, 15);
             lblStatus.Name = "lblStatus";
-            lblStatus.Size = new Size(38, 15);
-            lblStatus.TabIndex = 0;
-            lblStatus.Text = "label1";
-            // 
-            // listBox1
-            // 
-            listBox1.FormattingEnabled = true;
-            listBox1.ItemHeight = 15;
-            listBox1.Location = new Point(12, 181);
-            listBox1.Name = "listBox1";
-            listBox1.Size = new Size(754, 244);
-            listBox1.TabIndex = 1;
-            // 
-            // label1
-            // 
-            label1.AutoSize = true;
-            label1.Location = new Point(12, 50);
-            label1.Name = "label1";
-            label1.Size = new Size(38, 15);
-            label1.TabIndex = 2;
-            label1.Text = "label1";
-            label1.Click += label1_Click;
-            // 
-            // label2
-            // 
-            label2.AutoSize = true;
-            label2.Location = new Point(12, 79);
-            label2.Name = "label2";
-            label2.Size = new Size(38, 15);
-            label2.TabIndex = 3;
-            label2.Text = "label1";
-            // 
-            // label3
-            // 
-            label3.AutoSize = true;
-            label3.Location = new Point(12, 109);
-            label3.Name = "label3";
-            label3.Size = new Size(38, 15);
-            label3.TabIndex = 4;
-            label3.Text = "label1";
-            // 
-            // button1
-            // 
-            button1.Location = new Point(547, 130);
-            button1.Name = "button1";
-            button1.Size = new Size(230, 23);
-            button1.TabIndex = 5;
-            button1.Text = "Write to PLC";
-            button1.UseVisualStyleBackColor = true;
-            button1.Click += button1_Click;
-            // 
-            // _txtNewValue
-            // 
-            _txtNewValue.Location = new Point(547, 76);
-            _txtNewValue.Name = "_txtNewValue";
-            _txtNewValue.Size = new Size(230, 23);
-            _txtNewValue.TabIndex = 6;
-            // 
+            lblStatus.Size = new Size(95, 17);
+            lblStatus.TabIndex = 1;
+            lblStatus.Text = "Disconnected";
+            //
+            // lblStatusCaption
+            //
+            lblStatusCaption.AutoSize = true;
+            lblStatusCaption.ForeColor = Color.Gray;
+            lblStatusCaption.Location = new Point(14, 16);
+            lblStatusCaption.Name = "lblStatusCaption";
+            lblStatusCaption.Size = new Size(45, 15);
+            lblStatusCaption.TabIndex = 0;
+            lblStatusCaption.Text = "Status:";
+            //
+            // grid
+            //
+            grid.AllowUserToAddRows = false;
+            grid.AllowUserToDeleteRows = false;
+            grid.AllowUserToResizeRows = false;
+            grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+            grid.BackgroundColor = Color.White;
+            grid.BorderStyle = BorderStyle.None;
+            grid.CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal;
+            grid.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
+            grid.Columns.AddRange(new DataGridViewColumn[] { colName, colAddress, colType, colValue, colLast, colStatus, colUpdated });
+            grid.Dock = DockStyle.Fill;
+            grid.EditMode = DataGridViewEditMode.EditProgrammatically;
+            grid.Location = new Point(0, 48);
+            grid.MultiSelect = false;
+            grid.Name = "grid";
+            grid.ReadOnly = true;
+            grid.RowHeadersVisible = false;
+            grid.RowTemplate.Height = 26;
+            grid.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+            grid.Size = new Size(1004, 425);
+            grid.TabIndex = 1;
+            grid.SelectionChanged += grid_SelectionChanged;
+            //
+            // colName
+            //
+            colName.FillWeight = 130F;
+            colName.HeaderText = "Tag";
+            colName.Name = "colName";
+            colName.ReadOnly = true;
+            //
+            // colAddress
+            //
+            colAddress.FillWeight = 110F;
+            colAddress.HeaderText = "Address";
+            colAddress.Name = "colAddress";
+            colAddress.ReadOnly = true;
+            //
+            // colType
+            //
+            colType.FillWeight = 70F;
+            colType.HeaderText = "Type";
+            colType.Name = "colType";
+            colType.ReadOnly = true;
+            //
+            // colValue
+            //
+            colValue.DefaultCellStyle = new DataGridViewCellStyle { Font = new Font("Consolas", 9.75F, FontStyle.Bold), Alignment = DataGridViewContentAlignment.MiddleRight };
+            colValue.FillWeight = 110F;
+            colValue.HeaderText = "Value";
+            colValue.Name = "colValue";
+            colValue.ReadOnly = true;
+            //
+            // colLast
+            //
+            colLast.DefaultCellStyle = new DataGridViewCellStyle { Font = new Font("Consolas", 9F), ForeColor = Color.Gray, Alignment = DataGridViewContentAlignment.MiddleRight };
+            colLast.FillWeight = 100F;
+            colLast.HeaderText = "Last Value";
+            colLast.Name = "colLast";
+            colLast.ReadOnly = true;
+            //
+            // colStatus
+            //
+            colStatus.FillWeight = 80F;
+            colStatus.HeaderText = "Status";
+            colStatus.Name = "colStatus";
+            colStatus.ReadOnly = true;
+            //
+            // colUpdated
+            //
+            colUpdated.DefaultCellStyle = new DataGridViewCellStyle { ForeColor = Color.Gray, Alignment = DataGridViewContentAlignment.MiddleCenter };
+            colUpdated.FillWeight = 90F;
+            colUpdated.HeaderText = "Updated";
+            colUpdated.Name = "colUpdated";
+            colUpdated.ReadOnly = true;
+            //
+            // grpWrite
+            //
+            grpWrite.Controls.Add(lblTypeHint);
+            grpWrite.Controls.Add(btnWrite);
+            grpWrite.Controls.Add(txtNewValue);
+            grpWrite.Controls.Add(_cbTagName);
+            grpWrite.Controls.Add(lblValueCaption);
+            grpWrite.Controls.Add(lblTagCaption);
+            grpWrite.Controls.Add(btnReadNow);
+            grpWrite.Dock = DockStyle.Bottom;
+            grpWrite.Location = new Point(0, 473);
+            grpWrite.Name = "grpWrite";
+            grpWrite.Padding = new Padding(12, 6, 12, 6);
+            grpWrite.Size = new Size(1004, 88);
+            grpWrite.TabIndex = 2;
+            grpWrite.TabStop = false;
+            grpWrite.Text = "Write to PLC";
+            //
+            // lblTypeHint
+            //
+            lblTypeHint.AutoSize = true;
+            lblTypeHint.Font = new Font("Segoe UI", 8F, FontStyle.Italic);
+            lblTypeHint.ForeColor = Color.Gray;
+            lblTypeHint.Location = new Point(312, 56);
+            lblTypeHint.Name = "lblTypeHint";
+            lblTypeHint.Size = new Size(0, 13);
+            lblTypeHint.TabIndex = 4;
+            //
+            // btnWrite
+            //
+            btnWrite.BackColor = Color.FromArgb(0, 122, 204);
+            btnWrite.FlatStyle = FlatStyle.Flat;
+            btnWrite.Font = new Font("Segoe UI Semibold", 9.75F, FontStyle.Bold);
+            btnWrite.ForeColor = Color.White;
+            btnWrite.Location = new Point(640, 28);
+            btnWrite.Name = "btnWrite";
+            btnWrite.Size = new Size(140, 38);
+            btnWrite.TabIndex = 3;
+            btnWrite.Text = "Write  ▶";
+            btnWrite.UseVisualStyleBackColor = false;
+            btnWrite.Click += button1_Click;
+            //
+            // txtNewValue
+            //
+            txtNewValue.Font = new Font("Consolas", 11F);
+            txtNewValue.Location = new Point(312, 30);
+            txtNewValue.Name = "txtNewValue";
+            txtNewValue.Size = new Size(310, 25);
+            txtNewValue.TabIndex = 2;
+            //
             // _cbTagName
-            // 
+            //
+            _cbTagName.DropDownStyle = ComboBoxStyle.DropDownList;
             _cbTagName.FormattingEnabled = true;
-            _cbTagName.Location = new Point(549, 32);
+            _cbTagName.Location = new Point(15, 31);
             _cbTagName.Name = "_cbTagName";
-            _cbTagName.Size = new Size(217, 23);
-            _cbTagName.TabIndex = 7;
-            // 
-            // label4
-            // 
-            label4.AutoSize = true;
-            label4.Location = new Point(482, 35);
-            label4.Name = "label4";
-            label4.Size = new Size(61, 15);
-            label4.TabIndex = 8;
-            label4.Text = "Tag Name";
-            // 
-            // label5
-            // 
-            label5.AutoSize = true;
-            label5.Location = new Point(480, 79);
-            label5.Name = "label5";
-            label5.Size = new Size(35, 15);
-            label5.TabIndex = 9;
-            label5.Text = "NewValue";
-            // 
-            // label6
-            // 
-            label6.AutoSize = true;
-            label6.Font = new Font("Segoe UI", 7F, FontStyle.Italic);
-            label6.Location = new Point(549, 103);
-            label6.Name = "label6";
-            label6.Size = new Size(150, 12);
-            label6.TabIndex = 10;
-            label6.Text = "(According to the data type of tag)";
-            // 
+            _cbTagName.Size = new Size(280, 23);
+            _cbTagName.TabIndex = 1;
+            _cbTagName.SelectedIndexChanged += _cbTagName_SelectedIndexChanged;
+            //
+            // lblValueCaption
+            //
+            lblValueCaption.AutoSize = true;
+            lblValueCaption.ForeColor = Color.DimGray;
+            lblValueCaption.Location = new Point(312, 12);
+            lblValueCaption.Name = "lblValueCaption";
+            lblValueCaption.Size = new Size(64, 15);
+            lblValueCaption.TabIndex = 0;
+            lblValueCaption.Text = "New value";
+            //
+            // lblTagCaption
+            //
+            lblTagCaption.AutoSize = true;
+            lblTagCaption.ForeColor = Color.DimGray;
+            lblTagCaption.Location = new Point(15, 12);
+            lblTagCaption.Name = "lblTagCaption";
+            lblTagCaption.Size = new Size(26, 15);
+            lblTagCaption.TabIndex = 0;
+            lblTagCaption.Text = "Tag";
+            //
+            // btnReadNow
+            //
+            btnReadNow.FlatStyle = FlatStyle.Flat;
+            btnReadNow.Location = new Point(800, 28);
+            btnReadNow.Name = "btnReadNow";
+            btnReadNow.Size = new Size(140, 38);
+            btnReadNow.TabIndex = 5;
+            btnReadNow.Text = "Read Now  ↻";
+            btnReadNow.UseVisualStyleBackColor = true;
+            btnReadNow.Click += btnReadNow_Click;
+            //
             // Form1
-            // 
-            AcceptButton = button1;
+            //
+            AcceptButton = btnWrite;
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(800, 450);
-            Controls.Add(label6);
-            Controls.Add(label5);
-            Controls.Add(label4);
-            Controls.Add(_cbTagName);
-            Controls.Add(_txtNewValue);
-            Controls.Add(button1);
-            Controls.Add(label3);
-            Controls.Add(label2);
-            Controls.Add(label1);
-            Controls.Add(listBox1);
-            Controls.Add(lblStatus);
+            ClientSize = new Size(1004, 561);
+            Controls.Add(grid);
+            Controls.Add(grpWrite);
+            Controls.Add(pnlTop);
+            MinimumSize = new Size(820, 480);
             Name = "Form1";
-            Text = "Form1";
+            StartPosition = FormStartPosition.CenterScreen;
+            Text = "Snap7 SCADA — Tag Monitor & Test";
             Load += Form1_Load;
+            pnlTop.ResumeLayout(false);
+            pnlTop.PerformLayout();
+            ((System.ComponentModel.ISupportInitialize)grid).EndInit();
+            grpWrite.ResumeLayout(false);
+            grpWrite.PerformLayout();
             ResumeLayout(false);
-            PerformLayout();
         }
 
         #endregion
 
+        private Panel pnlTop;
+        private Label lblStatusCaption;
         private Label lblStatus;
-        private ListBox listBox1;
-        private Label label1;
-        private Label label2;
-        private Label label3;
-        private Button button1;
-        private TextBox _txtNewValue;
+        private Label lblHost;
+        private DataGridView grid;
+        private DataGridViewTextBoxColumn colName;
+        private DataGridViewTextBoxColumn colAddress;
+        private DataGridViewTextBoxColumn colType;
+        private DataGridViewTextBoxColumn colValue;
+        private DataGridViewTextBoxColumn colLast;
+        private DataGridViewTextBoxColumn colStatus;
+        private DataGridViewTextBoxColumn colUpdated;
+        private GroupBox grpWrite;
+        private Label lblTagCaption;
         private ComboBox _cbTagName;
-        private Label label4;
-        private Label label5;
-        private Label label6;
+        private Label lblValueCaption;
+        private TextBox txtNewValue;
+        private Button btnWrite;
+        private Label lblTypeHint;
+        private Button btnReadNow;
     }
 }
