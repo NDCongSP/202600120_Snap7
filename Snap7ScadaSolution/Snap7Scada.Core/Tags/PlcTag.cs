@@ -71,6 +71,19 @@ public class PlcTag
     // 1. Thêm LastValue để so sánh hoặc hiển thị lịch sử gần nhất 🔄
     public object? LastValue { get; set; }
 
+    /// <summary>
+    /// Giá trị đang chờ ghi xuống PLC. Set property này rồi gọi PlcGroupWriter.WriteGroup/WriteGroupAsync.
+    /// </summary>
+    /// <remarks>
+    /// Tách biệt HOÀN TOÀN với NewValue (giá trị đọc được từ PLC, do ApplyScaling ghi mỗi vòng polling).
+    /// Trước đây 2 việc dùng chung field NewValue: nếu WriteGroupAsync chạy trong Task.Run và vòng polling
+    /// 200ms đọc lại tag đúng lúc đó, ApplyScaling() sẽ ghi đè NewValue bằng giá trị cũ đọc từ PLC TRƯỚC KHI
+    /// WriteValue() kịp lấy giá trị để build buffer ghi → PLC nhận giá trị cũ thay vì giá trị vừa set (race
+    /// condition "lúc được lúc không", không phụ thuộc nhánh code, trúng bất kỳ lần ghi nào). Dùng field
+    /// riêng cho write-intent loại bỏ hoàn toàn khả năng đụng độ này.
+    /// </remarks>
+    public object? PendingWriteValue { get; set; }
+
     // ... các thuộc tính cơ bản
     public double OffsetValue { get; set; } = 0;
     public double GainRate { get; set; } = 1;

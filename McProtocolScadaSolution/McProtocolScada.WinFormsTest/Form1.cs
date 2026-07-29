@@ -261,7 +261,7 @@ namespace McProtocolScada.WinFormsTest
                     _ => int.TryParse(_txtNewValue.Text, out var i) ? i : 0
                 };
 
-                tag.NewValue = newValue;
+                tag.PendingWriteValue = newValue;
                 await Task.Run(() => session.Runtime.Writer.WriteGroup(new List<PlcTag> { tag }));
             }
             catch (Exception ex)

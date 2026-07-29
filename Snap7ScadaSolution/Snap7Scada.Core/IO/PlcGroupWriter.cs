@@ -30,9 +30,9 @@ public class PlcGroupWriter
         foreach (var tag in tags)
         {
             if (!_lastWritten.TryGetValue(tag.Name, out var old) ||
-                !Equals(old, tag.NewValue))
+                !Equals(old, tag.PendingWriteValue))
             {
-                _lastWritten[tag.Name] = tag.NewValue;
+                _lastWritten[tag.Name] = tag.PendingWriteValue;
                 changed.Add(tag);
             }
         }
@@ -93,13 +93,13 @@ public class PlcGroupWriter
     /// </summary>
     private static void WriteValue(byte[] buffer, int index, PlcTag tag)
     {
-        if (tag.NewValue == null) return;
+        if (tag.PendingWriteValue == null) return;
 
         switch (tag.DataType)
         {
             case PlcDataType.Bool:
                 // Ghi bit bằng mask
-                bool b = Convert.ToBoolean(tag.NewValue);
+                bool b = Convert.ToBoolean(tag.PendingWriteValue);
                 if (b)
                     buffer[index] |= (byte)(1 << tag.Bit);
                 else
@@ -108,50 +108,50 @@ public class PlcGroupWriter
 
             case PlcDataType.Byte:
             case PlcDataType.USInt:
-                buffer[index] = Convert.ToByte(tag.NewValue);
+                buffer[index] = Convert.ToByte(tag.PendingWriteValue);
                 break;
 
             case PlcDataType.SInt:
-                buffer[index] = (byte)Convert.ToSByte(tag.NewValue);
+                buffer[index] = (byte)Convert.ToSByte(tag.PendingWriteValue);
                 break;
 
             case PlcDataType.Char:
-                buffer[index] = (byte)Convert.ToChar(tag.NewValue);
+                buffer[index] = (byte)Convert.ToChar(tag.PendingWriteValue);
                 break;
 
             case PlcDataType.Word:
             case PlcDataType.UInt:
-                S7.SetWordAt(buffer, index, Convert.ToUInt16(tag.NewValue));
+                S7.SetWordAt(buffer, index, Convert.ToUInt16(tag.PendingWriteValue));
                 break;
 
             case PlcDataType.Int:
-                S7.SetIntAt(buffer, index, Convert.ToInt16(tag.NewValue));
+                S7.SetIntAt(buffer, index, Convert.ToInt16(tag.PendingWriteValue));
                 break;
 
             case PlcDataType.DWord:
             case PlcDataType.UDInt:
-                S7.SetDWordAt(buffer, index, Convert.ToUInt32(tag.NewValue));
+                S7.SetDWordAt(buffer, index, Convert.ToUInt32(tag.PendingWriteValue));
                 break;
 
             case PlcDataType.DInt:
-                S7.SetDIntAt(buffer, index, Convert.ToInt32(tag.NewValue));
+                S7.SetDIntAt(buffer, index, Convert.ToInt32(tag.PendingWriteValue));
                 break;
 
             case PlcDataType.Real:
-                S7.SetRealAt(buffer, index, Convert.ToSingle(tag.NewValue));
+                S7.SetRealAt(buffer, index, Convert.ToSingle(tag.PendingWriteValue));
                 break;
 
             case PlcDataType.LWord:
             case PlcDataType.ULInt:
-                S7.SetULintAt(buffer, index, Convert.ToUInt64(tag.NewValue));
+                S7.SetULintAt(buffer, index, Convert.ToUInt64(tag.PendingWriteValue));
                 break;
 
             case PlcDataType.LInt:
-                S7.SetLIntAt(buffer, index, Convert.ToInt64(tag.NewValue));
+                S7.SetLIntAt(buffer, index, Convert.ToInt64(tag.PendingWriteValue));
                 break;
 
             case PlcDataType.LReal:
-                S7.SetLRealAt(buffer, index, Convert.ToDouble(tag.NewValue));
+                S7.SetLRealAt(buffer, index, Convert.ToDouble(tag.PendingWriteValue));
                 break;
 
             case PlcDataType.String:
@@ -165,7 +165,7 @@ public class PlcGroupWriter
     /// </summary>
     private static void WriteString(byte[] buffer, int index, PlcTag tag)
     {
-        string text = tag.NewValue?.ToString() ?? "";
+        string text = tag.PendingWriteValue?.ToString() ?? "";
 
         buffer[index] = (byte)tag.StringLength;
         buffer[index + 1] = (byte)Math.Min(text.Length, tag.StringLength);

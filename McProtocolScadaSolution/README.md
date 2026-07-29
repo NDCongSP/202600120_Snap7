@@ -124,7 +124,7 @@ var reader = new PlcGroupReader(plc);
 await reader.ReadGroupAsync(tags);
 
 var writer = new PlcGroupWriter(plc);
-tags.First(t => t.Name == "IsCheck").NewValue = true;
+tags.First(t => t.Name == "IsCheck").PendingWriteValue = true;
 await writer.WriteGroupAsync(new[] { tags.First(t => t.Name == "IsCheck") });
 
 // 4) Subscription (polling + event change)

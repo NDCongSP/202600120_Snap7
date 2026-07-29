@@ -43,9 +43,9 @@ public class PlcGroupWriter
         foreach (var tag in tags)
         {
             if (!_lastWritten.TryGetValue(tag.Name, out var old) ||
-                !Equals(old, tag.NewValue))
+                !Equals(old, tag.PendingWriteValue))
             {
-                _lastWritten[tag.Name] = tag.NewValue;
+                _lastWritten[tag.Name] = tag.PendingWriteValue;
                 changed.Add(tag);
             }
         }
@@ -136,7 +136,7 @@ public class PlcGroupWriter
     /// <summary>Ghi 1 tag vào buffer (đơn vị byte).</summary>
     private void EncodeWordValue(byte[] buffer, int index, PlcTag tag)
     {
-        if (tag.NewValue == null) return;
+        if (tag.PendingWriteValue == null) return;
 
         var bt = (IByteTransform)_plc.Client.ByteTransform;
 
@@ -144,7 +144,7 @@ public class PlcGroupWriter
         {
             case PlcDataType.Bool:
                 {
-                    bool b = Convert.ToBoolean(tag.NewValue);
+                    bool b = Convert.ToBoolean(tag.PendingWriteValue);
                     int bit = tag.Bit;
                     int byteOff = bit / 8;
                     int bitOff  = bit % 8;
@@ -155,50 +155,50 @@ public class PlcGroupWriter
 
             case PlcDataType.Byte:
             case PlcDataType.USInt:
-                buffer[index] = Convert.ToByte(tag.NewValue);
+                buffer[index] = Convert.ToByte(tag.PendingWriteValue);
                 break;
 
             case PlcDataType.SInt:
-                buffer[index] = (byte)Convert.ToSByte(tag.NewValue);
+                buffer[index] = (byte)Convert.ToSByte(tag.PendingWriteValue);
                 break;
 
             case PlcDataType.Char:
-                buffer[index] = (byte)Convert.ToChar(tag.NewValue);
+                buffer[index] = (byte)Convert.ToChar(tag.PendingWriteValue);
                 break;
 
             case PlcDataType.Word:
             case PlcDataType.UInt:
-                CopyTo(buffer, index, bt.TransByte(Convert.ToUInt16(tag.NewValue)));
+                CopyTo(buffer, index, bt.TransByte(Convert.ToUInt16(tag.PendingWriteValue)));
                 break;
 
             case PlcDataType.Int:
-                CopyTo(buffer, index, bt.TransByte(Convert.ToInt16(tag.NewValue)));
+                CopyTo(buffer, index, bt.TransByte(Convert.ToInt16(tag.PendingWriteValue)));
                 break;
 
             case PlcDataType.DWord:
             case PlcDataType.UDInt:
-                CopyTo(buffer, index, bt.TransByte(Convert.ToUInt32(tag.NewValue)));
+                CopyTo(buffer, index, bt.TransByte(Convert.ToUInt32(tag.PendingWriteValue)));
                 break;
 
             case PlcDataType.DInt:
-                CopyTo(buffer, index, bt.TransByte(Convert.ToInt32(tag.NewValue)));
+                CopyTo(buffer, index, bt.TransByte(Convert.ToInt32(tag.PendingWriteValue)));
                 break;
 
             case PlcDataType.Real:
-                CopyTo(buffer, index, bt.TransByte(Convert.ToSingle(tag.NewValue)));
+                CopyTo(buffer, index, bt.TransByte(Convert.ToSingle(tag.PendingWriteValue)));
                 break;
 
             case PlcDataType.LWord:
             case PlcDataType.ULInt:
-                CopyTo(buffer, index, bt.TransByte(Convert.ToUInt64(tag.NewValue)));
+                CopyTo(buffer, index, bt.TransByte(Convert.ToUInt64(tag.PendingWriteValue)));
                 break;
 
             case PlcDataType.LInt:
-                CopyTo(buffer, index, bt.TransByte(Convert.ToInt64(tag.NewValue)));
+                CopyTo(buffer, index, bt.TransByte(Convert.ToInt64(tag.PendingWriteValue)));
                 break;
 
             case PlcDataType.LReal:
-                CopyTo(buffer, index, bt.TransByte(Convert.ToDouble(tag.NewValue)));
+                CopyTo(buffer, index, bt.TransByte(Convert.ToDouble(tag.PendingWriteValue)));
                 break;
 
             case PlcDataType.String:
@@ -210,7 +210,7 @@ public class PlcGroupWriter
     /// <summary>Ghi string ASCII Mitsubishi (2 ký tự / 1 word, padding bằng 0).</summary>
     private static void WriteString(byte[] buffer, int index, PlcTag tag)
     {
-        string text = tag.NewValue?.ToString() ?? "";
+        string text = tag.PendingWriteValue?.ToString() ?? "";
         if (text.Length > tag.StringLength)
             text = text.Substring(0, tag.StringLength);
 
@@ -233,10 +233,10 @@ public class PlcGroupWriter
         {
             foreach (var tag in group)
             {
-                if (tag.NewValue == null) continue;
+                if (tag.PendingWriteValue == null) continue;
 
                 string addr = FormatAddress(group.Key, tag.Offset, tag.OffsetRadix);
-                bool value = Convert.ToBoolean(tag.NewValue);
+                bool value = Convert.ToBoolean(tag.PendingWriteValue);
 
                 lock (_plc.SyncLock)
                 {

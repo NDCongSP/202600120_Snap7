@@ -220,6 +220,21 @@ var wordCount = (StringLength + 1) / 2; // chia StringLength+1 cho 2
 ```yaml
 active_context:
   current_task: >
+    Session 12: Fix TRIỆT ĐỂ race condition ghi PLC sai giá trị ("lúc được lúc không") ở CẢ 2 driver
+    (Snap7Scada.Core VÀ McProtocolScada.Core — cùng bug vì port 1-1 theo ADR-2). Root cause: PlcTag.NewValue
+    dùng CHUNG 1 field cho 2 việc — (a) giá trị đọc từ PLC do ApplyScaling() ghi mỗi vòng polling
+    (Subscribe intervalMs=200) và (b) giá trị caller set trước khi gọi WriteGroupAsync (chạy trong
+    Task.Run, có độ trễ thread pool + lock SyncLock). Nếu vòng polling đọc lại tag đúng lúc write task
+    đang chờ tới lượt, ApplyScaling() ghi đè NewValue bằng giá trị cũ từ PLC TRƯỚC KHI WriteValue()/
+    EncodeWordValue() kịp lấy giá trị để build buffer → PLC nhận giá trị cũ, ghi "thành công" (không
+    exception) nhưng SAI giá trị. Race condition thuần theo thời gian, trúng bất kỳ lần ghi nào, không
+    phụ thuộc nhánh code cụ thể (khớp đúng hiện tượng user báo cáo). FIX: thêm property riêng biệt
+    `PlcTag.PendingWriteValue` chỉ dùng cho write-intent — ApplyScaling() (đường đọc) không bao giờ đụng
+    vào field này nữa, loại bỏ hoàn toàn khả năng đụng độ (không phải giảm xác suất — triệt tiêu nguyên
+    nhân). Áp dụng cho cả PlcGroupWriter.cs (WriteValue/EncodeWordValue/WriteBitDevices/WriteGroupOnlyChanged)
+    và mọi call site set write value (WinFormsTest Form1.cs button write, README.md example). Build 0
+    error/0 warning cả 2 solution, McProtocolScada.Tests 97/97 PASS (không cần sửa test).
+  previous_task: >
     Session 11: Bỏ HOÀN TOÀN dependency HslCommunication khỏi project (yêu cầu user: "BO LUON
     THU VIEN HslCommunication"). PackageReference đã được gỡ khỏi McProtocolScada.Lib.csproj
     từ trước (code không còn compile được) — task này viết lại các phần còn phụ thuộc:
@@ -248,6 +263,13 @@ active_context:
     station:       0
     note:          "Port 8000 = MC Protocol (Open Setting Line 2). Station=0 (=0xFF gây timeout). Pingable dùng ICMP tránh làm đầy connection table Q series (~8 slots)."
   related_files:
+    - "Snap7ScadaSolution/Snap7Scada.Core/Tags/PlcTag.cs"
+    - "Snap7ScadaSolution/Snap7Scada.Core/IO/PlcGroupWriter.cs"
+    - "Snap7ScadaSolution/Snap7Scada.WinFormsTest/Form1.cs"
+    - "McProtocolScadaSolution/McProtocolScada.Core/Tags/PlcTag.cs"
+    - "McProtocolScadaSolution/McProtocolScada.Core/IO/PlcGroupWriter.cs"
+    - "McProtocolScadaSolution/McProtocolScada.WinFormsTest/Form1.cs"
+    - "McProtocolScadaSolution/README.md"
     - "McProtocolScadaSolution/McProtocolScada.Core/Core/PlcClient.cs"
     - "McProtocolScadaSolution/McProtocolScada.Core/Core/Mc3EBinaryClient.cs"
     - "McProtocolScadaSolution/McProtocolScada.Core/Core/OperateResult.cs"
@@ -260,12 +282,18 @@ active_context:
     - "McProtocolScadaSolution/McProtocolScada.WinFormsTest/tags.json"
     - "McProtocolScadaSolution/McProtocolScada.Tests/Mc3EBinaryClientTests.cs"
   verified_ok:
+    - "Session 12 (2026-07-29): Build 0 error/0 warning cả Snap7ScadaSolution.slnx và McProtocolScadaSolution.slnx sau khi thêm PlcTag.PendingWriteValue"
+    - "Session 12 (2026-07-29): McProtocolScada.Tests 97/97 PASS — không cần sửa test nào (hành vi read-path ApplyScaling không đổi)"
     - "Build: 0 error 0 warning (2026-06-16, sau khi bỏ HslCommunication hoàn toàn)"
     - "Unit tests: 97/97 PASS — không cần sửa test, hành vi IByteTransform tự viết giữ nguyên 100%"
     - "RegularByteTransform tự viết đã xác nhận khớp byte-for-byte với HslCommunication thật (DataFormat.DCBA = little-endian thuần) qua probe project thực nghiệm"
     - "BuildBatchReadRequest(D162) khớp byte-for-byte với capture thật từ PLC (TestRawAsync, Q06UDV 192.168.11.1:8000)"
     - "ROOT CAUSE license limit (Session 9/DEC-011) ĐÃ XỬ LÝ TRIỆT ĐỂ — project không còn 1 dòng code nào gọi HslCommunication (PackageReference đã gỡ khỏi mọi .csproj)"
   next_steps:
+    - "0. ƯU TIÊN CAO (Session 12): test write trên PLC thật (cả Snap7 lẫn Mitsubishi) với polling"
+    - "   đang chạy song song — xác nhận PendingWriteValue triệt tiêu race condition ghi sai giá trị"
+    - "   như báo cáo gốc (MetalPusher/WeightPusher lúc đúng lúc sai). Trước đây CHỈ phát hiện qua"
+    - "   review code, CHƯA test lại trên hardware thật sau fix."
     - "1. ƯU TIÊN CAO: test Mc3EBinaryClient với PLC thật Q06UDV — chạy app, đọc liên tục nhiều giờ,"
     - "   xác nhận KHÔNG còn 'System authorization failed' và watchdog reconnect hoạt động đúng"
     - "2. Verify Write (word D-register) hoạt động đúng trên PLC thật — chỉ Read đã được verify qua TestRawAsync trước đây"
@@ -276,7 +304,7 @@ active_context:
     - "   nếu cần dùng thật thì phải viết raw-TCP client riêng cho từng frame đó (chưa làm, không cấp thiết)"
     - "5. Test Write từ ComboBox dạng 'PLC_1:Part' → verify PLC nhận đúng"
     - "6. Verify plc_history.db ghi dữ liệu cho cả 3 PLC"
-  last_session:   "2026-06-16"
+  last_session:   "2026-07-29"
   open_questions:
     - "Device code byte ngoài D (0xA8) — đúng theo tài liệu chuẩn nhưng CHƯA verify trên Q06UDV thật"
     - "Bit-packing nibble (low=chẵn, high=lẻ) cho M/X/Y/B — CHƯA verify trên hardware, chỉ có round-trip unit test logic"
@@ -303,6 +331,7 @@ active_context:
 | DEC-010 | 2026-06-15 | Watchdog dùng SemaphoreSlim.WaitAsync thay Task.Delay → NotifyError() wake watchdog ngay, không đợi interval | `Core/PlcClient.cs` |
 | DEC-012 | 2026-06-16 | Viết `Mc3EBinaryClient` (raw TCP tự cài đặt QnA-3E Binary frame) thay `HslCommunication.MelsecMcNet` cho frame QnA3E_Binary — loại bỏ HOÀN TOÀN giới hạn license process-level (DEC-011) vì không còn gọi HslCommunication trên đường dữ liệu chính. API khớp 1-1 (Read/ReadBool/Write/ConnectClose/ByteTransform) nên PlcGroupReader/Writer không cần sửa. Giữ ByteTransform=RegularByteTransform(DataFormat.DCBA) khớp default MelsecMcNet. Frame đã verify byte-for-byte với capture PLC thật (D162); device code ngoài D và bit-packing CHƯA verify hardware. Các frame ASCII/A1E/iQR (không dùng) vẫn giữ HslCommunication | `Core/Mc3EBinaryClient.cs` (mới), `Core/PlcClient.cs` |
 | DEC-013 | 2026-06-16 | Bỏ HOÀN TOÀN dependency HslCommunication khỏi project (yêu cầu user). Viết `OperateResult`/`OperateResult<T>` và `IByteTransform`/`RegularByteTransform` tự có (POCO đơn giản). Xác nhận bằng thực nghiệm (chạy thật `RegularByteTransform` của HslCommunication 11.6.4 qua probe project tham chiếu DLL trong NuGet cache) rằng `DataFormat.DCBA` = little-endian thuần, không hoán đổi byte/word — nên bản tự viết bỏ luôn enum DataFormat, chỉ delegate sang `BitConverter`. `PlcClient.CreateClient()` chỉ còn case QnA3E_Binary; 4 frame ASCII/A1E/iQR (xác nhận không dùng) giờ throw `NotSupportedException` vì không còn HslCommunication để dùng tạm. Build 0 error/0 warning, 97/97 test PASS không cần sửa | `Core/OperateResult.cs` (mới), `Core/ByteTransform.cs` (mới), `Core/Mc3EBinaryClient.cs`, `Core/PlcClient.cs`, `IO/PlcGroupReader.cs`, `IO/PlcGroupWriter.cs` |
+| DEC-014 | 2026-07-29 | **FIX RACE CONDITION ghi PLC sai giá trị (CẢ 2 driver)**: `PlcTag.NewValue` trước đây dùng chung cho read-path (`ApplyScaling()` ghi mỗi vòng polling 200ms) và write-path (caller set trước khi gọi `WriteGroupAsync`, chạy trong `Task.Run` nên có độ trễ). Nếu polling đọc lại tag đúng lúc write task đang chờ lock, `ApplyScaling()` ghi đè `NewValue` bằng giá trị cũ từ PLC trước khi `WriteValue()`/`EncodeWordValue()` kịp lấy giá trị để build buffer → PLC nhận giá trị cũ, ghi "thành công" nhưng sai giá trị (bug do user báo cáo: "lúc được lúc không"). Thêm property `PlcTag.PendingWriteValue` — TÁCH BIỆT HOÀN TOÀN khỏi `NewValue`, chỉ dùng cho write-intent; read-path (`ApplyScaling`) không bao giờ đụng vào field này → triệt tiêu nguyên nhân gốc thay vì giảm xác suất trúng race. `PlcGroupWriter` (cả 2 driver) đọc `tag.PendingWriteValue` thay vì `tag.NewValue`; mọi call site set write value (WinFormsTest, README) đổi theo. `NewValue` giờ CHỈ còn ý nghĩa "giá trị đọc được từ PLC / hiển thị UI" | `Snap7Scada.Core/Tags/PlcTag.cs`, `Snap7Scada.Core/IO/PlcGroupWriter.cs`, `Snap7Scada.WinFormsTest/Form1.cs`, `McProtocolScada.Core/Tags/PlcTag.cs`, `McProtocolScada.Core/IO/PlcGroupWriter.cs`, `McProtocolScada.WinFormsTest/Form1.cs`, `McProtocolScadaSolution/README.md` |
 
 ### 4.3 Hướng dẫn Claude đọc context
 
@@ -318,6 +347,32 @@ Khi bắt đầu session mới, Claude PHẢI:
 
 > Format: `[YYYY-MM-DD] [TYPE] [File/Module] — Mô tả`  
 > Types: `FEAT` · `FIX` · `REFACTOR` · `PERF` · `TEST` · `DOCS` · `CHORE` · `BREAK`
+
+---
+
+### [2026-07-29] — Session 12 (Fix race condition ghi PLC sai giá trị — cả 2 driver)
+
+```
+[ROOT CAUSE] PlcTag.NewValue dùng CHUNG field cho read-path (ApplyScaling() ghi mỗi vòng polling
+             200ms) và write-path (caller set NewValue rồi gọi WriteGroupAsync chạy trong Task.Run,
+             có độ trễ thread pool + chờ lock SyncLock). Nếu polling đọc lại tag đúng lúc write task
+             đang chờ tới lượt, ApplyScaling() ghi đè NewValue bằng giá trị cũ từ PLC TRƯỚC KHI
+             WriteValue()/EncodeWordValue() kịp lấy giá trị build buffer → PLC nhận giá trị cũ, ghi
+             "thành công" (không exception) nhưng SAI giá trị. Race condition thuần theo thời gian,
+             trúng bất kỳ lần ghi nào (vd MetalPusher/WeightPusher), không phụ thuộc nhánh code cụ thể.
+[FIX]   Snap7Scada.Core/Tags/PlcTag.cs                       — NEW: property PendingWriteValue — TÁCH BIỆT HOÀN TOÀN với NewValue, chỉ dùng cho write-intent
+[FIX]   Snap7Scada.Core/IO/PlcGroupWriter.cs                 — WriteValue/WriteString/WriteGroupOnlyChanged đọc tag.PendingWriteValue thay vì tag.NewValue
+[FIX]   Snap7Scada.WinFormsTest/Form1.cs                     — button1_Click (nút Write): set tag.PendingWriteValue thay vì tag.NewValue trước khi WriteGroup
+[FIX]   McProtocolScada.Core/Tags/PlcTag.cs                  — NEW: property PendingWriteValue (giống Snap7, port 1-1 theo ADR-2)
+[FIX]   McProtocolScada.Core/IO/PlcGroupWriter.cs             — EncodeWordValue/WriteString/WriteBitDevices/WriteGroupOnlyChanged đọc tag.PendingWriteValue thay vì tag.NewValue
+[FIX]   McProtocolScada.WinFormsTest/Form1.cs                — nút Write: set tag.PendingWriteValue thay vì tag.NewValue trước khi WriteGroup
+[DOCS]  McProtocolScadaSolution/README.md                    — Cập nhật example code dùng PendingWriteValue cho write
+[DOCS]  CLAUDE.md                                             — Thêm DEC-014, active_context Session 12, CHANGELOG
+[BUILD] Snap7ScadaSolution.slnx + McProtocolScadaSolution.slnx: build 0 error/0 warning — 2026-07-29
+[TEST]  McProtocolScada.Tests: 97/97 PASS (không cần sửa test, hành vi read-path ApplyScaling không đổi) — 2026-07-29
+[PENDING] Chưa test lại trên PLC thật (Snap7 lẫn Mitsubishi) với polling chạy song song để xác nhận
+          hiện tượng "ghi lúc được lúc không" đã hết hẳn — chỉ mới xác nhận qua code review + build/test
+```
 
 ---
 

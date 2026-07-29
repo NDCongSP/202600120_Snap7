@@ -279,7 +279,7 @@ namespace Snap7Scada.WinFormsTest
                 return;
             }
 
-            tag.NewValue = newValue;
+            tag.PendingWriteValue = newValue;
             var tagsToWrite = new List<PlcTag> { tag };
 
             try

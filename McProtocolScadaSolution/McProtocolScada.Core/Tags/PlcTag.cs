@@ -78,6 +78,19 @@ public class PlcTag
     /// </summary>
     public object? LastValue { get; set; }
 
+    /// <summary>
+    /// Giá trị đang chờ ghi xuống PLC. Set property này rồi gọi PlcGroupWriter.WriteGroup/WriteGroupAsync.
+    /// </summary>
+    /// <remarks>
+    /// Tách biệt HOÀN TOÀN với NewValue (giá trị đọc được từ PLC, do ApplyScaling ghi mỗi vòng polling).
+    /// Trước đây 2 việc dùng chung field NewValue: nếu WriteGroupAsync chạy trong Task.Run và vòng polling
+    /// đọc lại tag đúng lúc đó, ApplyScaling() sẽ ghi đè NewValue bằng giá trị cũ đọc từ PLC TRƯỚC KHI
+    /// EncodeWordValue()/WriteBitDevices() kịp lấy giá trị để build buffer ghi → PLC nhận giá trị cũ thay
+    /// vì giá trị vừa set (race condition "lúc được lúc không"). Dùng field riêng cho write-intent loại
+    /// bỏ hoàn toàn khả năng đụng độ này. Xem CLAUDE.md DEC (fix chung áp dụng cho cả 2 driver Snap7/MC).
+    /// </remarks>
+    public object? PendingWriteValue { get; set; }
+
     /// <summary>Cộng vào giá trị thô trước khi trả về.</summary>
     public double OffsetValue { get; set; } = 0;
 
